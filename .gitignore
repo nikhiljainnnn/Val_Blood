@@ -82,3 +82,8 @@ credentials.csv
 # PyTorch Checkpoints
 *.pt
 *.pth
+
+# Local debug / credential-check scripts (NEVER commit these)
+check_bedrock.py
+check_aws.py
+test_credentials.py

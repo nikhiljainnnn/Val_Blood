@@ -141,10 +141,13 @@ async def ivr_websocket(websocket: WebSocket, session_id: str):
                 audio_data = data.get("audio_b64", "")
                 if audio_data:
                     transcript = await sarvam.asr(audio_data, session.language)
-                    # Map transcript to intent
+                    
+                    # Fallback: simple keyword matching for intent if Lex is not available
                     digit = _transcript_to_digit(transcript, session.language)
+                    intent_name = "ConfirmIntent" if digit == "1" else "DenyIntent" if digit == "2" else "Unknown"
+                        
                     result = await session.handle_dtmf(digit, sarvam)
-                    await websocket.send_json({**result, "transcript": transcript})
+                    await websocket.send_json({**result, "transcript": transcript, "intent": intent_name})
 
     except WebSocketDisconnect:
         logger.info(f"IVR WebSocket disconnected: {session_id}")

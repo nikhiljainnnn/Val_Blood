@@ -3,8 +3,12 @@ RakSetu Notification Service
 - WhatsApp → SMS → Voice cascade with Celery
 - Multilingual templates (5 languages)
 - Donor response tracking
+- UPGRADE 1: Self-improving failure learning (POST /notify/failure-learn)
+- UPGRADE 3: Conversation memory (appended after every outreach)
+- UPGRADE 5: Blood group awareness campaign (POST /notify/awareness/run)
 """
 import os
+import sys
 import json
 import uuid
 import logging
@@ -22,6 +26,12 @@ from shared.redis_client import get_redis
 from shared.schemas import NotificationIn, NotificationOut
 from gupshup_client import GupshupClient
 from templates import get_template, get_sms_template
+
+# ── Upgrade wiring ────────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lambdas'))
+from upgrade1_failure_learner import router as failure_router    # noqa: E402
+from upgrade3_conversation_memory import append_event            # noqa: E402
+from upgrade5_awareness_campaign import router as awareness_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("notification-service")
@@ -48,21 +58,36 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RakSetu Notification Service", version="1.0.0", lifespan=lifespan)
 
+# ── Mount upgrade routers ─────────────────────────────────────────────────────
+app.include_router(failure_router)    # POST /notify/failure-learn
+app.include_router(awareness_router)  # POST /notify/awareness/run, GET /notify/awareness/stats
+
 
 @app.post("/notify/donor", response_model=NotificationOut)
 async def notify_donor(
-    body: NotificationIn,
+    body: dict,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Fire notification cascade for a single donor.
     Returns immediately after first channel sent; Celery handles fallback.
     """
+    import os
+    if os.getenv("DEMO_MODE", "false").lower() == "true":
+        logger.info(f"[DEMO] Simulated notification to donor {body.get('donor_id')}")
+        return NotificationOut(
+            notification_id="demo_notif_123",
+            donor_id=body.get("donor_id", "demo_donor"),
+            channels_fired=["whatsapp"],
+            status="sent",
+            created_at=datetime.utcnow()
+        )
+
     # Load donor phone + language
     result = await db.execute(
         select(Person, Donor)
         .join(Donor, Donor.person_id == Person.id)
-        .where(Donor.id == body.donor_id)
+        .where(Donor.id == body.get("donor_id"))
     )
     row = result.first()
     if not row:
@@ -73,8 +98,8 @@ async def notify_donor(
     phone = person.phone
 
     # Pull patient story from cache / story engine
-    story = await _get_story(body.donor_id, body.patient_id, lang)
-    slot  = body.slot_time or _next_slot_str()
+    story = await _get_story(body.get("donor_id"), body.get("patient_id"), lang)
+    slot  = body.get("slot_time") or _next_slot_str()
 
     # Build WhatsApp message
     wa_msg = get_template(
@@ -94,8 +119,8 @@ async def notify_donor(
         state_key,
         86400,   # 24h TTL
         json.dumps({
-            "donor_id":   body.donor_id,
-            "request_id": body.request_id,
+            "donor_id":   body.get("donor_id"),
+            "request_id": body.get("request_id"),
             "replied":    False,
             "channel":    "whatsapp",
             "sent_at":    datetime.utcnow().isoformat(),
@@ -107,9 +132,17 @@ async def notify_donor(
     wa_result = await gupshup.send_whatsapp(phone, wa_msg)
     channels_fired = ["whatsapp"]
 
+    # ── UPGRADE 3: Record in conversation memory ──────────────────────────────
+    append_event(
+        donor_id=body.get("donor_id", ""),
+        event_type="whatsapp_sent",
+        content=f"Outreach for request {body.get('request_id')} — {body.get('urgency', 'normal')} urgency",
+        channel="whatsapp",
+    )
+
     # Record signal
     signal = DonorSignal(
-        donor_id=body.donor_id,
+        donor_id=body.get("donor_id", ""),
         signal_type="msg_open",
         value={"channel": "whatsapp", "notification_id": notification_id},
     )
@@ -117,24 +150,24 @@ async def notify_donor(
     await db.commit()
 
     # For critical/urgent: also fire SMS immediately
-    if body.urgency in ["urgent", "critical"]:
+    if body.get("urgency") in ["urgent", "critical"]:
         sms_msg = get_sms_template(lang, person.name, slot)
         await gupshup.send_sms(phone, sms_msg)
         channels_fired.append("sms")
 
     # Schedule fallback escalations via Celery
     _schedule_sms_fallback.apply_async(
-        args=[notification_id, body.donor_id, phone, lang, slot],
+        args=[notification_id, body.get("donor_id", ""), phone, lang, slot],
         countdown=7200,   # 2 hours
     )
     _schedule_voice_fallback.apply_async(
-        args=[notification_id, body.donor_id, phone, lang],
+        args=[notification_id, body.get("donor_id", ""), phone, lang],
         countdown=10800,  # 3 hours
     )
 
     return NotificationOut(
         notification_id=notification_id,
-        donor_id=body.donor_id,
+        donor_id=body.get("donor_id", ""),
         channels_fired=channels_fired,
         status="sent",
         created_at=datetime.utcnow(),

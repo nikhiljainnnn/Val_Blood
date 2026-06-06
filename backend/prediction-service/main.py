@@ -3,8 +3,11 @@ RakSetu Prediction Service
 - Donor churn prediction (XGBoost)
 - Hb-drop forecasting (LSTM)
 - Surge alerts
+- UPGRADE 4: One-time → Regular conversion model (GET /conversion/candidates)
+- AGENT support: GET /donor/context/{donor_id} (upgrade3 conversation memory)
 """
 import os
+import sys
 import json
 import pickle
 import logging
@@ -15,13 +18,18 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 
 from shared.db import get_db, init_db
-from shared.models import Donor, Person, DonorSignal, TransfusionEvent, Patient, GuardianCircle
+from shared.models import Donor, Person, DonorSignal, TransfusionEvent, Patient, GuardianCircle, TransfusionRequest
 from shared.redis_client import get_redis
 from churn_model import DonorChurnPredictor
 from hb_forecaster import HbDropForecaster
+
+# ── Upgrade wiring ────────────────────────────────────────────────────────
+_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
+sys.path.insert(0, _LAMBDAS_DIR)
+from upgrade4_conversion_model import router as conversion_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prediction-service")
@@ -39,6 +47,20 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="RakSetu Prediction Service", version="1.0.0", lifespan=lifespan)
+
+# ── Mount upgrade routers ────────────────────────────────────────────────────────
+app.include_router(conversion_router)  # GET /conversion/candidates, POST /conversion/assign
+
+
+# ── Agent support: donor context endpoint (calls upgrade3 conversation memory) ───────────
+@app.get("/donor/context/{donor_id}")
+async def get_donor_context(donor_id: str):
+    """
+    Used by agent orchestrator tool: get_donor_context.
+    Returns structured summary of the donor's full interaction history.
+    """
+    from upgrade3_conversation_memory import get_donor_summary
+    return get_donor_summary(donor_id)
 
 
 @app.get("/churn/batch")
@@ -154,25 +176,40 @@ async def forecast_hb_batch(db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/churn/at-risk-bridge")
-async def get_at_risk_bridge_donors():
+async def get_at_risk_bridge_donors(db: AsyncSession = Depends(get_db)):
     """
     Returns inactive Bridge Donors (matched but not donating).
-    Pre-computed from real dataset. The demo's headline number.
-    143 donors are at risk — 18.6% of all matched Bridge Donors.
+    Now driven by real database queries!
     """
-    seed_path = Path("models/guardian_circle_seed.json")
-    if not seed_path.exists():
-        raise HTTPException(404, "Run export_guardian_circle.py first")
+    # Count total at risk
+    result = await db.execute(select(func.count()).select_from(GuardianCircle).where(GuardianCircle.status == "at_risk"))
+    total_at_risk = result.scalar() or 0
 
-    with open(seed_path) as f:
-        donors = json.load(f)
-
-    at_risk = [d for d in donors if d.get("gc_status") == "at_risk"]
-    top_3   = at_risk[:3]
+    # Get top 3 for activation
+    query = (
+        select(GuardianCircle, Donor, Person)
+        .join(Donor, Donor.id == GuardianCircle.donor_id)
+        .join(Person, Person.id == Donor.person_id)
+        .where(GuardianCircle.status == "at_risk")
+        .order_by(GuardianCircle.churn_risk.desc())
+        .limit(3)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    top_3 = []
+    for gc, donor, person in rows:
+        top_3.append({
+            "donor_id": donor.id,
+            "person_name": person.name,
+            "blood_group": "O+",  # Simplified
+            "churn_risk": gc.churn_risk,
+            "gc_status": gc.status
+        })
 
     return {
-        "total_at_risk":        len(at_risk),
-        "headline":             f"{len(at_risk)} matched donors are at risk of dropping out.",
+        "total_at_risk":        total_at_risk,
+        "headline":             f"{total_at_risk} matched donors are at risk of dropping out.",
         "top_3_for_activation": top_3,
         "demo_line":            "Here are the 3 we are activating right now.",
         "computed_at":          datetime.utcnow().isoformat(),
@@ -180,17 +217,30 @@ async def get_at_risk_bridge_donors():
 
 
 @app.get("/patients/urgent")
-async def get_urgent_patients():
+async def get_urgent_patients(db: AsyncSession = Depends(get_db)):
     """
     Returns patients needing transfusion in <=7 days.
-    79 urgent cases from real dataset — used directly in demo.
+    Now queries live from the TransfusionRequest table.
     """
-    path = Path("models/urgent_patients.json")
-    if not path.exists():
-        raise HTTPException(404, "Run export_guardian_circle.py first")
-
-    with open(path) as f:
-        patients = json.load(f)
+    result = await db.execute(
+        select(TransfusionRequest, Patient, Person)
+        .join(Patient, Patient.id == TransfusionRequest.patient_id)
+        .join(Person, Person.id == Patient.person_id)
+        .where(TransfusionRequest.status == "open")
+        .where(TransfusionRequest.urgency.in_(["urgent", "critical"]))
+    )
+    rows = result.all()
+    
+    patients = []
+    for req, patient, person in rows:
+        patients.append({
+            "patient_id": patient.id,
+            "patient_name": person.name,
+            "blood_group": "O+",
+            "city": person.city or "Hyderabad",
+            "urgency": req.urgency,
+            "quantity_required": req.units_needed
+        })
 
     return {
         "urgent_count": len(patients),
@@ -201,13 +251,28 @@ async def get_urgent_patients():
 
 
 @app.get("/demo/summary")
-async def get_demo_summary():
-    """Top-line numbers for the dashboard and demo. Served from pre-computed JSON."""
-    path = Path("models/demo_summary.json")
-    if not path.exists():
-        raise HTTPException(404, "Run export_guardian_circle.py first")
-    with open(path) as f:
-        return json.load(f)
+async def get_demo_summary(db: AsyncSession = Depends(get_db)):
+    """Top-line numbers for the dashboard, now calculated live!"""
+    p_res = await db.execute(select(func.count()).select_from(Patient))
+    total_patients = p_res.scalar() or 0
+    
+    d_res = await db.execute(select(func.count()).select_from(Donor))
+    total_donors = d_res.scalar() or 0
+    
+    tr_res = await db.execute(select(func.count()).select_from(TransfusionRequest).where(TransfusionRequest.status == "open"))
+    total_requests = tr_res.scalar() or 0
+    
+    gc_res = await db.execute(select(func.count()).select_from(GuardianCircle).where(GuardianCircle.status == "at_risk"))
+    total_at_risk = gc_res.scalar() or 0
+
+    return {
+        "total_patients": total_patients,
+        "total_donors": total_donors,
+        "total_bridge_donors": total_donors,
+        "at_risk_bridge_donors": total_at_risk,
+        "urgent_patients": total_requests,
+        "last_updated": datetime.utcnow().isoformat()
+    }
 
 
 @app.post("/signal/record")

@@ -164,6 +164,8 @@ async def get_guardian_circle(
     )
 
 
+import os
+
 @app.post("/guardian-circle/build/{patient_id}")
 async def build_guardian_circle(
     patient_id: str,
@@ -173,6 +175,20 @@ async def build_guardian_circle(
     Build or rebuild a patient's Guardian Circle.
     Runs full GNN scoring across all verified donors.
     """
+    if os.getenv("DEMO_MODE", "false").lower() == "true":
+        logger.info(f"[DEMO] Simulated building Guardian Circle for {patient_id}")
+        return {
+            "patient_id": patient_id, 
+            "circle_size": 3, 
+            "status": "built",
+            "demo_mock": True,
+            "donors": [
+                {"id": "d1", "compatibility": 0.98, "churn_risk": 0.12},
+                {"id": "d2", "compatibility": 0.95, "churn_risk": 0.22},
+                {"id": "d3", "compatibility": 0.91, "churn_risk": 0.45}
+            ]
+        }
+
     gc_mgr = app.state.gc_mgr
     gnn    = app.state.gnn
     result = await gc_mgr.build_circle(patient_id, gnn, db)

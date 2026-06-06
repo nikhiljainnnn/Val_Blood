@@ -9,15 +9,17 @@ const PRED_URL = API_CONFIG.predURL;
 // Set VITE_DEMO_MODE=true in .env, or the app auto-detects backend unavailability.
 export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true" || true;
 
-export const api = axios.create({
+const baseConfig = {
   baseURL: BASE_URL,
-  timeout: 8000,               // fail fast in demo mode
-  headers: { "Content-Type": "application/json" },
-});
+  timeout: 60000,               // Allow 60s for agentic workflow to complete
+  headers: { "Content-Type": "application/json" }
+};
+
+export const api = axios.create(baseConfig);
 
 export const predApi = axios.create({
   baseURL: PRED_URL,
-  timeout: 8000,
+  timeout: 60000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -95,4 +97,80 @@ export const demoAPI = {
 export const interventionAPI = {
   generateMessage: (donorId: string, triggerReason: string, language = "hi") =>
     api.post("/intervention/generate", { donor_id: donorId, trigger_reason: triggerReason, language }),
+};
+
+// ── Upgrades 1–6 + Agent API ─────────────────────────────────────────────────
+// All routes go through the api-gateway base URL (/api/v1).
+// predApi is used for prediction-service routes (port 8002).
+export const upgradesAPI = {
+
+  // ── Agent (orchestrator.py) ──────────────────────────────────────────────
+  /** Run the Bedrock Supervisor with a free-text task */
+  runAgent: (task: string, context: object = {}) =>
+    api.post("/agent/run", { task, context }),
+
+  /** Trigger a predefined scheduled task (daily_churn_scan | patient_request | etc.) */
+  runScheduled: (trigger: string) =>
+    api.post("/agent/scheduled", { trigger }),
+
+  /** Health check — returns model, demo_mode, tools list */
+  agentStatus: () =>
+    api.get("/agent/status"),
+
+  // ── Upgrade 6: Past-due transfusion alerts ───────────────────────────────
+  /** Returns urgency breakdown: critical 656, urgent 67, high 28, normal 35 */
+  alertSummary: () =>
+    api.get("/admin/alerts/summary"),
+
+  /** Run the urgency scan and trigger cascades for critical patients */
+  scanAlerts: () =>
+    api.post("/admin/alerts/scan"),
+
+  /** Manually trigger outreach cascade for a specific patient */
+  cascadePatient: (patientId: string, urgency = "urgent") =>
+    api.post(`/admin/alerts/cascade/${patientId}`, null, { params: { urgency } }),
+
+  // ── Upgrade 2: Guest activation ──────────────────────────────────────────
+  /** Stats on the 2,420 dormant guest pool */
+  guestPoolStats: () =>
+    api.get("/admin/guest-pool/stats"),
+
+  /** Activate dormant guests (optional: filter by blood_group) */
+  activateGuests: (blood_group?: string, limit = 100) =>
+    api.post("/admin/activate-guests", { blood_group, limit }),
+
+  // ── Upgrade 5: Blood group awareness campaign ────────────────────────────
+  /** Trigger monthly campaign for 160 users with unknown blood group */
+  runAwareness: () =>
+    api.post("/notify/awareness/run"),
+
+  /** Stats: how many unknown blood group users, camp locations */
+  awarenessStats: () =>
+    api.get("/notify/awareness/stats"),
+
+  // ── Upgrade 4: One-time → regular conversion model ───────────────────────
+  /** Top N one-time donors ranked by conversion probability (model AUC 0.9214) */
+  conversionCandidates: (top_n = 50) =>
+    predApi.get("/conversion/candidates", { params: { top_n } }),
+
+  /** Assign a candidate as bridge donor + send personalised invite */
+  assignConversion: (body: {
+    donor_id: string; patient_id: string;
+    name: string; blood_group: string; language?: string;
+  }) =>
+    predApi.post("/conversion/assign", body),
+
+  // ── Upgrade 1: Failure learning ──────────────────────────────────────────
+  /** Log outreach failure and get recommended next protocol */
+  failureLearn: (body: {
+    donor_id: string; calls_attempted: number;
+    days_since_last_donation: number;
+    inactive_trigger_comment?: string; language?: string;
+  }) =>
+    api.post("/notify/failure-learn", body),
+
+  // ── Upgrade 3: Conversation memory ───────────────────────────────────────
+  /** Get structured interaction history summary for a donor */
+  donorContext: (donorId: string) =>
+    predApi.get(`/donor/context/${donorId}`),
 };

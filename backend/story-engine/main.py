@@ -45,6 +45,18 @@ async def get_donor_story(
     if cached:
         return json.loads(cached)
 
+    if os.getenv("DEMO_MODE", "false").lower() == "true":
+        logger.info(f"[DEMO] Simulated story for donor {donor_id} and patient {patient_id}")
+        return {
+            "donor_id":        donor_id,
+            "patient_id":      patient_id,
+            "story_text":      "Thank you for saving a life today. Your blood has given hope to a family in need.",
+            "language":        language,
+            "donation_number": 5,
+            "model_used":      "demo-mock",
+            "generated_at":    datetime.utcnow().isoformat(),
+        }
+
     donation_number = await _get_donation_number(donor_id, db)
     milestone       = await _get_milestone(patient_id, db)
 

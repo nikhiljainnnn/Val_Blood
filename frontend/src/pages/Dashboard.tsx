@@ -97,22 +97,29 @@ export default function Dashboard() {
   const { events, connected } = useDashboardStore();
   const { name } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [circle, setCircle] = useState<any[]>([]);
   const [statsData, setStatsData] = useState({
     active_patients: 0, active_donors: 0, guardian_circles: 0,
     at_risk_donors: 0, open_requests: 0, transfusions_this_month: 0,
   });
 
   useEffect(() => {
-    import("../api/client").then(({ demoAPI }) => {
+    import("../api/client").then(({ matchingAPI, demoAPI }) => {
+      // Fetch guardian circle donors
+      matchingAPI.getGuardianCircle("demo-patient-001")
+        .then(res => setCircle(res.data?.donors || []))
+        .catch(console.error);
+
+      // Fetch live dashboard stats
       demoAPI.getDemoSummary()
         .then(r => {
-          const hl = r.data?.headline_numbers || {};
+          const data = r.data || {};
           setStatsData({
-            active_patients: hl.total_patients || 487,
-            active_donors: hl.active_bridge_donors || 4218,
-            guardian_circles: hl.total_patients || 487,
-            at_risk_donors: hl.at_risk_bridge_donors || 143,
-            open_requests: hl.urgent_patients_7d || 12,
+            active_patients: data.total_patients || 487,
+            active_donors: data.total_donors || 4218,
+            guardian_circles: data.total_patients || 487,
+            at_risk_donors: data.at_risk_bridge_donors || 0,
+            open_requests: data.urgent_patients || 0,
             transfusions_this_month: 892,
           });
         })
@@ -197,7 +204,7 @@ export default function Dashboard() {
                     Patient Arjun
                   </h2>
                   <p style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--text-muted)", marginTop:4 }}>
-                    {DEMO_CIRCLE.length} guardian donors · dual-orbit network view
+                    {circle.length || DEMO_CIRCLE.length} guardian donors · dual-orbit network view
                   </p>
                 </div>
                 <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}>
@@ -206,7 +213,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <GuardianCircle donors={DEMO_CIRCLE} patientName="Arjun" width={680} height={540} />
+              <GuardianCircle donors={circle.length > 0 ? circle : DEMO_CIRCLE} patientName="Arjun" width={680} height={540} />
             </div>
 
             {/* Hb Forecast */}

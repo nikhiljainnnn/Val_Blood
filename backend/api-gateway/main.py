@@ -4,8 +4,12 @@ RakSetu API Gateway
 - Rate limiting (Redis sliding window)
 - Reverse proxy to microservices
 - WebSocket hub for real-time dashboard
+- UPGRADE 2: Guest activation engine  (POST /admin/activate-guests)
+- UPGRADE 6: Past-due transfusion alerts (POST /admin/alerts/scan)
+- AGENT:    Bedrock Supervisor orchestrator (POST /agent/run)
 """
 import os
+import sys
 import json
 import asyncio
 import logging
@@ -32,6 +36,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 from datetime import datetime
+
+# ── Upgrade + Agent wiring ────────────────────────────────────────────────────
+_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
+_BACKEND_DIR = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, _LAMBDAS_DIR)
+sys.path.insert(0, _BACKEND_DIR)
+
+from upgrade2_guest_activator import router as guest_router      # noqa: E402
+from upgrade6_past_due_alerts  import router as alerts_router    # noqa: E402
+from agent.orchestrator        import router as agent_router     # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api-gateway")
@@ -102,9 +116,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-security  = HTTPBearer()
-limiter   = RateLimiter()
+security    = HTTPBearer()
+limiter     = RateLimiter()
 http_client = httpx.AsyncClient(timeout=30.0)
+
+# ── Mount upgrade + agent routers ─────────────────────────────────────────────
+# These are mounted directly on the gateway (no prefix clash with /api/v1).
+# guest_router  → /admin/activate-guests, /admin/guest-pool/stats
+# alerts_router → /admin/alerts/scan, /admin/alerts/summary, /admin/alerts/cascade/{id}
+# agent_router  → /agent/run, /agent/scheduled, /agent/status
+app.include_router(guest_router)
+app.include_router(alerts_router)
+app.include_router(agent_router)
 
 
 # ─── Auth helpers ─────────────────────────────────────────────────────────────
@@ -237,6 +260,13 @@ async def get_churn_predictions(
     return await _proxy("prediction", "/churn/batch")
 
 
+@app.get("/api/v1/demo/summary")
+async def get_demo_summary(
+    user: TokenData = Depends(get_current_user),
+):
+    return await _proxy("prediction", "/demo/summary")
+
+
 @app.get("/api/v1/hb-forecast/{patient_id}")
 async def get_hb_forecast(
     patient_id: str,
@@ -271,6 +301,85 @@ async def get_dashboard_stats(user: TokenData = Depends(get_current_user)):
 @app.get("/api/v1/inventory")
 async def get_inventory(user: TokenData = Depends(get_current_user)):
     return await _proxy("analytics", "/inventory")
+
+
+# ── Frontend-facing /api/v1/admin/* proxy routes ──────────────────────────────
+# Lets the React app call /api/v1/admin/... through the same base URL.
+@app.get("/api/v1/admin/alerts/summary")
+async def api_alert_summary(user: TokenData = Depends(get_current_user)):
+    from upgrade6_past_due_alerts import get_alert_summary
+    return await get_alert_summary()
+
+
+@app.post("/api/v1/admin/alerts/scan")
+async def api_alert_scan(user: TokenData = Depends(get_current_user)):
+    from upgrade6_past_due_alerts import run_alert_scan
+    return await run_alert_scan()
+
+
+@app.post("/api/v1/admin/alerts/cascade/{patient_id}")
+async def api_cascade_patient(
+    patient_id: str,
+    urgency: str = "urgent",
+    user: TokenData = Depends(get_current_user),
+):
+    from upgrade6_past_due_alerts import trigger_cascade_for_patient
+    return await trigger_cascade_for_patient(patient_id, urgency)
+
+
+@app.get("/api/v1/admin/guest-pool/stats")
+async def api_guest_stats(user: TokenData = Depends(get_current_user)):
+    from upgrade2_guest_activator import guest_pool_stats
+    return await guest_pool_stats()
+
+
+@app.post("/api/v1/admin/activate-guests")
+async def api_activate_guests(
+    body: dict = {},
+    user: TokenData = Depends(get_current_user),
+):
+    from upgrade2_guest_activator import ActivateGuestsIn, activate_guests
+    from shared.db import get_db
+    # Use async generator manually to get the db session
+    db_gen = get_db()
+    db = await db_gen.__anext__()
+    try:
+        return await activate_guests(
+            ActivateGuestsIn(
+                blood_group=body.get("blood_group"),
+                limit=body.get("limit", 100),
+            ),
+            db=db,
+        )
+    finally:
+        await db_gen.aclose()
+
+
+# ── Frontend-facing /api/v1/agent/* routes ────────────────────────────────────
+@app.post("/api/v1/agent/run")
+async def api_agent_run(
+    body: dict,
+):
+    from agent.orchestrator import run_supervisor
+    return await run_supervisor(body.get("task", ""), body.get("context", {}))
+
+
+@app.post("/api/v1/agent/scheduled")
+async def api_agent_scheduled(
+    body: dict,
+    user: TokenData = Depends(get_current_user),
+):
+    from agent.orchestrator import run_scheduled
+    from pydantic import BaseModel
+    class _In(BaseModel):
+        trigger: str
+    return await run_scheduled(_In(trigger=body.get("trigger", "daily_churn_scan")))
+
+
+@app.get("/api/v1/agent/status")
+async def api_agent_status():
+    from agent.orchestrator import agent_status
+    return await agent_status()
 
 
 # ─── WebSocket ────────────────────────────────────────────────────────────────
