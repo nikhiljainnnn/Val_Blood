@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { useDashboardStore } from "@/store";
+import { useDashboardStore } from "../store";
 
 const DEMO_EVENTS = [
   { event: "new_request",     urgency: "critical", label: "🩸 Critical: Arjun (B+) needs 2 units within 48h" },

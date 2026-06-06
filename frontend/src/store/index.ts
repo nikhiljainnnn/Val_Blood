@@ -2,26 +2,45 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 // ─── Auth store ───────────────────────────────────────────────────────────────
+import { signOut, fetchAuthSession } from "../lib/cognito";
+
+// ─── Auth store ───────────────────────────────────────────────────────────────
 interface AuthState {
-  token:  string | null;
-  role:   string | null;
-  userId: string | null;
-  name:   string | null;
-  setAuth: (token: string, role: string, userId: string, name: string) => void;
-  logout: () => void;
+  token:        string | null;
+  role:         string | null;
+  userId:       string | null;
+  name:         string | null;
+  setAuth:      (token: string, role: string, userId: string, name: string) => void;
+  refreshToken: () => Promise<void>;
+  logout:       () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token:  null,
-      role:   null,
-      userId: null,
-      name:   null,
+      token:   null,
+      role:    null,
+      userId:  null,
+      name:    null,
+
       setAuth: (token, role, userId, name) =>
         set({ token, role, userId, name }),
-      logout: () =>
-        set({ token: null, role: null, userId: null, name: null }),
+
+      // Call this on app load to silently refresh Cognito session
+      refreshToken: async () => {
+        try {
+          const session = await fetchAuthSession();
+          const token = session.tokens?.idToken?.toString() ?? null;
+          if (token) set({ token });
+        } catch {
+          set({ token: null, role: null, userId: null, name: null });
+        }
+      },
+
+      logout: async () => {
+        try { await signOut(); } catch { /* ignore */ }
+        set({ token: null, role: null, userId: null, name: null });
+      },
     }),
     { name: "raksetu-auth" }
   )

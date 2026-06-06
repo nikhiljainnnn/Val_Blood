@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer, Legend,
 } from "recharts";
-import { predictionAPI } from "@/api/client";
+import { predictionAPI } from "../api/client";
 
 interface HbPoint {
   day:      string;

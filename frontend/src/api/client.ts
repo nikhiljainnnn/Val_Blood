@@ -1,7 +1,8 @@
+import { API_CONFIG } from "./config";
 import axios from "axios";
-import { useAuthStore } from "@/store";
+import { useAuthStore } from "../store";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const BASE_URL = API_CONFIG.baseURL;
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -69,4 +70,14 @@ export const storyAPI = {
 export const dashboardAPI = {
   getStats:     () => api.get("/dashboard/stats"),
   getInventory: () => api.get("/inventory"),
+};
+
+
+export const donorAPI = {
+  getAtRisk:      () => api.get("/donors/at-risk"),
+  triggerCascade: (donorId: string) => api.post(`/donors/${donorId}/cascade`),
+};
+
+export const patientAPI = {
+  getUrgent: () => api.get("/patients/urgent"),
 };

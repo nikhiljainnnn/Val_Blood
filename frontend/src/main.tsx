@@ -1,13 +1,26 @@
 import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuthStore, useDashboardStore } from "@/store";
+import { useAuthStore, useDashboardStore } from "./store";
+
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_WS_URL?: string;
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
 
 // Pages
-import Dashboard    from "@/pages/Dashboard";
-import PatientView  from "@/pages/PatientView";
-import DonorPortal  from "@/pages/DonorPortal";
-import Onboarding   from "@/pages/Onboarding";
-import Login        from "@/pages/Login";
+import Dashboard    from "./pages/Dashboard";
+import PatientView  from "./pages/PatientView";
+import DonorPortal  from "./pages/DonorPortal";
+import Onboarding   from "./pages/Onboarding";
+import Login        from "./pages/Login";
+
+
+// refresh token on app start will be handled inside App component
 
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws/dashboard";
 
@@ -72,6 +85,9 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    useAuthStore.getState().refreshToken();
+  }, []);
   return (
     <BrowserRouter>
       <WebSocketProvider>

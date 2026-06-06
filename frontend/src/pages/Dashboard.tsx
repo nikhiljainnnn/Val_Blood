@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, Users, Heart, AlertTriangle, Droplets, TrendingUp } from "lucide-react";
-import { useDashboardStore, useAuthStore } from "@/store";
-import { dashboardAPI } from "@/api/client";
-import AlertBanner     from "@/components/AlertBanner";
-import GuardianCircle  from "@/components/GuardianCircle";
-import HbForecastChart from "@/components/HbForecastChart";
+import { useDashboardStore, useAuthStore } from "../store";
+import { dashboardAPI } from "../api/client";
+import AlertBanner     from "../components/AlertBanner";
+import GuardianCircle  from "../components/GuardianCircle";
+import HbForecastChart from "../components/HbForecastChart";
+import { useNavigate } from "react-router-dom";
+
+const navigate = useNavigate();
 
 const URGENCY_COLOR = {
   normal:   "border-blue-500/40 bg-blue-500/5",
@@ -81,11 +84,14 @@ export default function Dashboard() {
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+
+          <button onClick={() => navigate("/urgent")} style={{ background: "rgba(232,85,78,0.1)", border: "1px solid rgba(232,85,78,0.3)", color: "#E8554E", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+            ⚡ 67 Urgent Cases
+          </button>
+          <button onClick={() => navigate("/at-risk")} style={{ background: "rgba(232,149,42,0.1)", border: "1px solid rgba(232,149,42,0.3)", color: "#E8952A", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+            ⚠ 146 At-Risk Donors
+          </button>
           <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: connected ? "#1DB88E" : "#E8552A", display: "inline-block", boxShadow: connected ? "0 0 6px #1DB88E" : "none" }} />
-            <span style={{ color: connected ? "#1DB88E" : "#888" }}>{connected ? "live" : "reconnecting"}</span>
-          </span>
-          <span style={{ color: "#888", fontSize: 13 }}>Welcome, {name || "Coordinator"}</span>
         </div>
       </header>
 
