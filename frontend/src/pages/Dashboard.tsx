@@ -8,7 +8,7 @@ import GuardianCircle  from "../components/GuardianCircle";
 import HbForecastChart from "../components/HbForecastChart";
 import { useNavigate } from "react-router-dom";
 
-const navigate = useNavigate();
+
 
 const URGENCY_COLOR = {
   normal:   "border-blue-500/40 bg-blue-500/5",
@@ -25,6 +25,7 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { events, connected, stats } = useDashboardStore();
   const { name, role }               = useAuthStore();
   const [loading, setLoading]        = useState(true);

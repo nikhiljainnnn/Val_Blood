@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Heart, Award, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import StoryCard from "@/components/StoryCard";
+import StoryCard from "../components/StoryCard";
 
 const DEMO_DONOR = {
   id: "demo-donor-001",
