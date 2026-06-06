@@ -8,6 +8,7 @@ import { useDashboardStore, useAuthStore } from "../store";
 import AlertBanner from "../components/AlertBanner";
 import GuardianCircle from "../components/GuardianCircle";
 import HbForecastChart from "../components/HbForecastChart";
+import AgentModal from "../components/AgentModal";
 import { useNavigate } from "react-router-dom";
 
 const EVENT_LABEL: Record<string, string> = {
@@ -97,6 +98,7 @@ export default function Dashboard() {
   const { events, connected } = useDashboardStore();
   const { name } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [circle, setCircle] = useState<any[]>([]);
   const [statsData, setStatsData] = useState({
     active_patients: 0, active_donors: 0, guardian_circles: 0,
@@ -173,6 +175,10 @@ export default function Dashboard() {
           <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate("/at-risk")}
             className="badge badge-warning" style={{ cursor:"pointer", padding:"7px 14px", border:"1px solid rgba(232,149,42,0.3)" }}>
             <AlertTriangle size={11} /> {statsData.at_risk_donors} At-Risk
+          </motion.button>
+          <motion.button whileTap={{ scale:0.97 }} onClick={() => setAgentOpen(true)}
+            className="btn-primary" style={{ padding:"9px 18px", background: "var(--navy-3)", border: "1px solid var(--border-light)" }}>
+            <Activity size={14} /> Run Agent
           </motion.button>
           <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate("/patient/demo-patient-001")}
             className="btn-primary" style={{ padding:"9px 18px" }}>
@@ -313,6 +319,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <AgentModal isOpen={agentOpen} onClose={() => setAgentOpen(false)} />
     </div>
   );
 }
