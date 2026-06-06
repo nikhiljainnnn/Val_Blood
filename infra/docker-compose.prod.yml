@@ -1,0 +1,208 @@
+version: "3.9"
+
+# RakSetu Production Docker Compose
+# Designed for a single EC2 t3.micro (~$0.60/day or free tier)
+# All services run on one instance — nginx handles routing
+
+services:
+
+  # ─── Infrastructure ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: raksetu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       raksetu
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-raksetu_prod}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d raksetu"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: raksetu-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  # ─── Backend services ────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: raksetu-gateway
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      DATABASE_URL:      postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:         redis://redis:6379
+      JWT_SECRET:        ${JWT_SECRET}
+      JWT_ALGORITHM:     HS256
+      JWT_EXPIRE_MINUTES: "1440"
+      MATCHING_URL:      http://matching-service:8001
+      PREDICTION_URL:    http://prediction-service:8002
+      NOTIFICATION_URL:  http://notification-service:8003
+      VOICE_URL:         http://voice-service:8004
+      FEDERATED_URL:     http://federated-aggregator:8005
+      STORY_URL:         http://story-engine:8007
+      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION:             ${AWS_REGION:-us-east-1}
+      DEMO_MODE:         ${DEMO_MODE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  matching-service:
+    build:
+      context: ./backend/matching-service
+      dockerfile: Dockerfile
+    container_name: raksetu-matching
+    restart: unless-stopped
+    expose:
+      - "8001"
+    volumes:
+      - model-data:/app/models
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:    redis://redis:6379
+      DEMO_MODE:    ${DEMO_MODE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  prediction-service:
+    build:
+      context: ./backend/prediction-service
+      dockerfile: Dockerfile
+    container_name: raksetu-prediction
+    restart: unless-stopped
+    expose:
+      - "8002"
+    volumes:
+      - model-data:/app/models
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:    redis://redis:6379
+      DEMO_MODE:    ${DEMO_MODE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: raksetu-notification
+    restart: unless-stopped
+    expose:
+      - "8003"
+    environment:
+      DATABASE_URL:          postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:             redis://redis:6379
+      CELERY_BROKER:         redis://redis:6379/1
+      GUPSHUP_API_KEY:       ${GUPSHUP_API_KEY:-}
+      GUPSHUP_SOURCE_NUMBER: ${GUPSHUP_SOURCE_NUMBER:-}
+      STORY_URL:             http://story-engine:8007
+      DEMO_MODE:             ${DEMO_MODE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  celery-worker:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: raksetu-celery
+    restart: unless-stopped
+    command: celery -A celery_tasks worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL:    postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:       redis://redis:6379
+      CELERY_BROKER:   redis://redis:6379/1
+      GUPSHUP_API_KEY: ${GUPSHUP_API_KEY:-}
+      DEMO_MODE:       ${DEMO_MODE:-false}
+    depends_on:
+      redis: { condition: service_healthy }
+
+  voice-service:
+    build:
+      context: ./backend/voice-service
+      dockerfile: Dockerfile
+    container_name: raksetu-voice
+    restart: unless-stopped
+    expose:
+      - "8004"
+    environment:
+      SARVAM_API_KEY:     ${SARVAM_API_KEY:-}
+      EXOTEL_SID:         ${EXOTEL_SID:-}
+      EXOTEL_TOKEN:       ${EXOTEL_TOKEN:-}
+      EXOTEL_CALLER_ID:   ${EXOTEL_CALLER_ID:-}
+      DEMO_MODE:          ${DEMO_MODE:-false}
+    depends_on:
+      redis: { condition: service_healthy }
+
+  federated-aggregator:
+    build:
+      context: ./backend/federated-aggregator
+      dockerfile: Dockerfile
+    container_name: raksetu-federated
+    restart: unless-stopped
+    expose:
+      - "8005"
+      - "9090"
+    volumes:
+      - model-data:/app/models/global
+    environment:
+      FL_MIN_CLIENTS: "2"
+      FLOWER_PORT:    "9090"
+      DEMO_MODE:      ${DEMO_MODE:-false}
+
+  story-engine:
+    build:
+      context: ./backend/story-engine
+      dockerfile: Dockerfile
+    container_name: raksetu-story
+    restart: unless-stopped
+    expose:
+      - "8007"
+    environment:
+      DATABASE_URL:           postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
+      REDIS_URL:              redis://redis:6379
+      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION:             ${AWS_REGION:-us-east-1}
+      DEMO_MODE:              ${DEMO_MODE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  # ─── Nginx reverse proxy + static frontend ───────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: raksetu-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - api-gateway
+
+volumes:
+  pgdata:
+  model-data:    # shared between matching + prediction services
+
+networks:
+  default:
+    name: raksetu-prod-network

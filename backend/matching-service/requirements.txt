@@ -1,0 +1,10 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+sqlalchemy[asyncio]==2.0.31
+asyncpg==0.29.0
+redis[hiredis]==5.0.7
+pydantic==2.8.2
+httpx==0.27.0
+torch==2.3.1
+torch-geometric==2.5.3
+numpy==1.26.4
