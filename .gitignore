@@ -55,3 +55,20 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Docker / Local Data
+pgdata/
+redis_data/
+
+# Coverage / Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log

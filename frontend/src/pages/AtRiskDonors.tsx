@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, User, Phone, Calendar, TrendingDown, Zap } from "lucide-react";
-import { donorAPI } from "../api/client";
+import { demoAPI, donorAPI } from "../api/client";
 import { useNavigate } from "react-router-dom";
 
 
@@ -42,8 +42,8 @@ export default function AtRiskDonors() {
   const [cascading, setCascading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    donorAPI.getAtRisk()
-      .then(r => setDonors(r.data))
+    demoAPI.getAtRiskBridge()
+      .then(r => setDonors(r.data.donors || r.data))
       .catch(() => setDonors(DEMO_DONORS))
       .finally(() => setLoading(false));
   }, []);

@@ -48,17 +48,26 @@ export default function Dashboard() {
   ]);
 
   useEffect(() => {
-    dashboardAPI.getStats()
-      .then(r => setStatsData(r.data))
-      .catch(() => {
-        // Use demo stats
-        setStatsData({
-          active_patients: 487, active_donors: 4218, guardian_circles: 487,
-          at_risk_donors: 143, open_requests: 12, units_available: 834,
-          transfusions_this_month: 892, avg_circle_health: 0.87,
-        });
-      })
-      .finally(() => setLoading(false));
+    import("../api/client").then(({ demoAPI }) => {
+      demoAPI.getDemoSummary()
+        .then(r => {
+          const hl = r.data.headline_numbers;
+          setStatsData({
+            active_patients: hl.total_patients || 487,
+            active_donors: hl.active_bridge_donors || 4218,
+            guardian_circles: hl.total_patients || 487,
+            at_risk_donors: hl.at_risk_bridge_donors || 143,
+            open_requests: hl.urgent_patients_7d || 12,
+            units_available: 834,
+            transfusions_this_month: 892,
+            avg_circle_health: 0.87,
+          });
+        })
+        .catch((err) => {
+          console.warn("Failed to load demo summary, using defaults", err);
+        })
+        .finally(() => setLoading(false));
+    });
   }, []);
 
   const statCards = [
@@ -91,7 +100,6 @@ export default function Dashboard() {
           <button onClick={() => navigate("/at-risk")} style={{ background: "rgba(232,149,42,0.1)", border: "1px solid rgba(232,149,42,0.3)", color: "#E8952A", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
             ⚠ 146 At-Risk Donors
           </button>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
         </div>
       </header>
 

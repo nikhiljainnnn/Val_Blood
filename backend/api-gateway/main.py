@@ -20,8 +20,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from auth import (
     create_access_token,
     verify_token,
-    hash_password,
-    verify_password,
     TokenData,
 )
 from rate_limit import RateLimiter

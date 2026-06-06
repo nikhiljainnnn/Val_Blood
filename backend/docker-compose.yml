@@ -36,8 +36,8 @@ services:
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: raksetu-gateway
     restart: unless-stopped
     ports:
@@ -62,14 +62,14 @@ services:
 
   matching-service:
     build:
-      context: ./backend/matching-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: matching-service/Dockerfile
     container_name: raksetu-matching
     restart: unless-stopped
     ports:
       - "8001:8001"
     volumes:
-      - ./backend/matching-service/models:/app/models
+      - ./matching-service/models:/app/matching-service/models
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:    redis://redis:6379
@@ -80,14 +80,14 @@ services:
 
   prediction-service:
     build:
-      context: ./backend/prediction-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: prediction-service/Dockerfile
     container_name: raksetu-prediction
     restart: unless-stopped
     ports:
       - "8002:8002"
     volumes:
-      - ./backend/prediction-service/models:/app/models
+      - ./prediction-service/models:/app/prediction-service/models
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:    redis://redis:6379
@@ -98,8 +98,8 @@ services:
 
   notification-service:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: notification-service/Dockerfile
     container_name: raksetu-notification
     restart: unless-stopped
     ports:
@@ -119,11 +119,11 @@ services:
 
   celery-worker:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: notification-service/Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
-    command: celery -A celery_tasks worker --loglevel=info --concurrency=4
+    command: celery -A main.celery_app worker --loglevel=info --concurrency=4
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
@@ -135,8 +135,8 @@ services:
 
   voice-service:
     build:
-      context: ./backend/voice-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: voice-service/Dockerfile
     container_name: raksetu-voice
     restart: unless-stopped
     ports:
@@ -155,25 +155,25 @@ services:
 
   federated-aggregator:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: federated-aggregator/Dockerfile
     container_name: raksetu-federated
     restart: unless-stopped
     ports:
       - "8005:8005"
       - "9090:9090"    # Flower FL server port
     volumes:
-      - ./backend/federated-aggregator/models:/app/models/global
+      - ./federated-aggregator/models:/app/federated-aggregator/models/global
     environment:
       FL_MIN_CLIENTS: "2"    # 2 for demo (3 for prod)
       FLOWER_PORT:    "9090"
-      MODEL_DIR:      /app/models/global
+      MODEL_DIR:      /app/federated-aggregator/models/global
       DEMO_MODE:      ${DEMO_MODE:-true}
 
   story-engine:
     build:
-      context: ./backend/story-engine
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: story-engine/Dockerfile
     container_name: raksetu-story
     restart: unless-stopped
     ports:
@@ -190,7 +190,7 @@ services:
   # ─── Frontend ────────────────────────────────────────────────────────────────
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
     container_name: raksetu-frontend
     restart: unless-stopped
@@ -202,8 +202,8 @@ services:
   # ─── Federated nodes (demo: 2 simulated hospital nodes) ──────────────────────
   fl-node-hospital-1:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: federated-aggregator/Dockerfile
     container_name: raksetu-fl-node-1
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_mumbai --aggregator federated-aggregator:9090
@@ -217,8 +217,8 @@ services:
 
   fl-node-hospital-2:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: federated-aggregator/Dockerfile
     container_name: raksetu-fl-node-2
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_delhi --aggregator federated-aggregator:9090

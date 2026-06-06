@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock, Droplets, MapPin, Phone } from "lucide-react";
-import { patientAPI, matchingAPI } from "../api/client";
+import { demoAPI, matchingAPI } from "../api/client";
 import { useNavigate } from "react-router-dom";
 
 interface UrgentPatient {
@@ -39,8 +39,8 @@ export default function UrgentCases() {
   const [triggering, setTriggering] = useState<string | null>(null);
 
   useEffect(() => {
-    patientAPI.getUrgent()
-      .then(r => setPatients(r.data))
+    demoAPI.getUrgentPatients()
+      .then(r => setPatients(r.data.patients || r.data))
       .catch(() => setPatients(DEMO_PATIENTS))
       .finally(() => setLoading(false));
   }, []);
