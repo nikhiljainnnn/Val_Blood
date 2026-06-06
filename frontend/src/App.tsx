@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store";
 
 import Sidebar       from "./components/Sidebar";
+import { ToastContainer } from "./components/Toast";
 import Login         from "./pages/Login";
 import Dashboard     from "./pages/Dashboard";
 import DonorPortal   from "./pages/DonorPortal";
@@ -10,6 +11,7 @@ import PatientView   from "./pages/PatientView";
 import Onboarding    from "./pages/Onboarding";
 import UrgentCases   from "./pages/UrgentCases";
 import AtRiskDonors  from "./pages/AtRiskDonors";
+import About         from "./pages/About";
 
 // ── Demo Mode Guard ───────────────────────────────────────────────────────────
 // In demo/local mode (no Cognito configured) we skip auth entirely.
@@ -46,6 +48,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         <Route path="/login"      element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
@@ -57,9 +60,11 @@ export default function App() {
         <Route path="/patient/:id" element={<PrivateRoute><PatientView /></PrivateRoute>} />
         <Route path="/urgent"    element={<PrivateRoute><UrgentCases /></PrivateRoute>} />
         <Route path="/at-risk"   element={<PrivateRoute><AtRiskDonors /></PrivateRoute>} />
+        <Route path="/about"     element={<PrivateRoute><About /></PrivateRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
+
 }
