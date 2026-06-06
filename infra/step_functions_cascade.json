@@ -1,0 +1,101 @@
+{
+  "Comment": "RakSetu Donor Outreach Cascade -- WhatsApp -> SMS -> Voice Call -> Escalate",
+  "StartAt": "SendWhatsApp",
+  "States": {
+    "SendWhatsApp": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:raksetu-send-whatsapp",
+      "ResultPath": "$.whatsapp_result",
+      "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 5, "MaxAttempts": 2}],
+      "Next": "WaitForWhatsAppReply",
+      "Comment": "Sends Gupshup WhatsApp message to donor in their language (hi/en/mr)"
+    },
+    "WaitForWhatsAppReply": {
+      "Type": "Wait",
+      "Seconds": 7200,
+      "Next": "CheckWhatsAppReply",
+      "Comment": "Wait 2 hours for WhatsApp reply"
+    },
+    "CheckWhatsAppReply": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.replied",
+          "BooleanEquals": true,
+          "Next": "RecordSuccess"
+        }
+      ],
+      "Default": "SendSMS",
+      "Comment": "replied=true set by webhook when donor responds"
+    },
+    "SendSMS": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:raksetu-send-sms",
+      "ResultPath": "$.sms_result",
+      "Next": "WaitForSMSReply",
+      "Comment": "Fallback: SMS via SNS if WhatsApp unread"
+    },
+    "WaitForSMSReply": {
+      "Type": "Wait",
+      "Seconds": 3600,
+      "Next": "CheckSMSReply",
+      "Comment": "Wait 1 hour for SMS reply"
+    },
+    "CheckSMSReply": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.replied",
+          "BooleanEquals": true,
+          "Next": "RecordSuccess"
+        }
+      ],
+      "Default": "InitiateVoiceCall"
+    },
+    "InitiateVoiceCall": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:raksetu-voice-call",
+      "ResultPath": "$.voice_result",
+      "Next": "LogCascadeOutcome",
+      "Comment": "Sarvam AI voice call in Hindi/Marathi/Telugu as final automated step"
+    },
+    "LogCascadeOutcome": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "raksetu-churn-events",
+        "Item": {
+          "donor_id":        {"S.$": "$.donor_id"},
+          "cascade_outcome": {"S": "voice_attempted"},
+          "timestamp":       {"S.$": "$$.Execution.StartTime"},
+          "churn_risk":      {"N.$": "States.Format('{}', $.churn_risk)"}
+        }
+      },
+      "Next": "EscalateToCoordinator",
+      "Comment": "Log to DynamoDB -- feeds back into churn model training"
+    },
+    "EscalateToCoordinator": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:raksetu-escalate",
+      "ResultPath": "$.escalation_result",
+      "Next": "CascadeComplete",
+      "Comment": "Notify human coordinator via SNS after all automated steps exhausted"
+    },
+    "RecordSuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "raksetu-churn-events",
+        "Item": {
+          "donor_id":        {"S.$": "$.donor_id"},
+          "cascade_outcome": {"S": "replied"},
+          "timestamp":       {"S.$": "$$.Execution.StartTime"}
+        }
+      },
+      "Next": "CascadeComplete"
+    },
+    "CascadeComplete": {
+      "Type": "Succeed"
+    }
+  }
+}

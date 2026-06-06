@@ -1,0 +1,45 @@
+{
+  "churn": {
+    "cv_auc_mean": 0.9855739169527957,
+    "cv_auc_std": 0.004077169561706984,
+    "cv_aucs": [
+      0.9827,
+      0.9829,
+      0.9936,
+      0.9841,
+      0.9845
+    ],
+    "n_samples": 7033,
+    "n_positive": 682,
+    "n_negative": 6351,
+    "pos_rate": 0.09697142044646666,
+    "top_features": {
+      "account_age_days": 0.8069933652877808,
+      "calls_to_donations_ratio": 0.06766858696937561,
+      "lifetime_donations": 0.05944059044122696,
+      "msg_replies_90d": 0.026835652068257332,
+      "days_since_last_donation": 0.022772416472434998
+    }
+  },
+  "trained_at": "2026-06-06T07:15:14.565079",
+  "features_used": [
+    "lifetime_donations",
+    "msg_replies_90d",
+    "account_age_days",
+    "days_since_last_donation",
+    "calls_to_donations_ratio",
+    "donated_earlier_flag",
+    "is_exam_season",
+    "month_sin",
+    "month_cos"
+  ],
+  "column_map": {
+    "donations_till_date": "lifetime_donations",
+    "total_calls": "msg_replies_90d",
+    "cycle_of_donations": "account_age_days",
+    "frequency_in_days": "days_since_last_donation",
+    "calls_to_donations_ratio": "calls_to_donations_ratio",
+    "latitude": "latitude",
+    "longitude": "longitude"
+  }
+}

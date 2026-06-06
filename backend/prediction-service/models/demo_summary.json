@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-06-06T06:54:51.539577",
+  "headline_numbers": {
+    "total_bridge_donors": 2061,
+    "active_bridge_donors": 1918,
+    "at_risk_bridge_donors": 143,
+    "at_risk_pct": 6.9,
+    "urgent_patients_7d": 79,
+    "total_patients": 84
+  },
+  "demo_lines": {
+    "line_1": "143 matched donors are at risk of dropping out.",
+    "line_2": "79 urgent cases identified automatically.",
+    "line_3": "Here are the 3 we are activating right now."
+  }
+}

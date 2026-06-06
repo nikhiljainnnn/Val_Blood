@@ -100,7 +100,7 @@ Write the message now:"""
         logger.error(f"Bedrock ClientError [{code}]: {e}")
         if code == "AccessDeniedException":
             logger.error(
-                "Model access not enabled. Go to AWS Console → Bedrock → Model access "
+                "Model access not enabled. Go to AWS Console -> Bedrock -> Model access "
                 "and enable 'Amazon Nova Lite' and 'Amazon Nova Micro'."
             )
         return _fallback_story(donation_number, language)
@@ -108,6 +108,90 @@ Write the message now:"""
     except Exception as e:
         logger.error(f"Bedrock story generation failed: {e}")
         return _fallback_story(donation_number, language)
+
+
+async def generate_intervention_message(
+    donor_id: str,
+    trigger_reason: str,
+    patient_name: str = "your patient",
+    language: str = "hi",
+) -> str:
+    """
+    Generate a personalized WhatsApp re-engagement message for an inactive donor.
+
+    Uses the inactive_trigger_comment from real Dataset.csv:
+      - "Not donated in last 1 year"
+      - "Very limited activity despite multiple calls"
+
+    Model: Nova Micro (cheapest) -- ~$0.0000035 per call.
+    """
+    if DEMO_MODE:
+        return _fallback_intervention(trigger_reason, patient_name, language)
+
+    LANG_NAMES = {
+        "hi": "Hindi (Devanagari script)",
+        "ta": "Tamil",
+        "te": "Telugu",
+        "bn": "Bengali",
+        "en": "English",
+        "mr": "Marathi (Devanagari script)",
+    }
+    lang_name = LANG_NAMES.get(language, "Hindi")
+
+    prompt = f"""You are RakSetu, a compassionate blood donation system in India.
+Write a short WhatsApp message in {lang_name} to re-engage an inactive blood donor.
+
+Donor's inactivity reason: {trigger_reason}
+Their patient waiting: {patient_name} needs blood every 21 days.
+
+Rules:
+- Exactly 2 sentences maximum
+- Warm -- never guilt-tripping
+- Mention the patient is waiting
+- End with ONE call to action (reply "1" to confirm)
+- Write ONLY the message, no preamble
+
+Message:"""
+
+    body = json.dumps({
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 120,
+        "inferenceConfig": {"temperature": 0.7, "topP": 0.9},
+    })
+
+    try:
+        client   = get_bedrock_client()
+        response = client.invoke_model(
+            modelId=NOVA_MICRO,
+            body=body,
+            contentType="application/json",
+            accept="application/json",
+        )
+        result = json.loads(response["body"].read())
+        text   = result["output"]["message"]["content"][0]["text"].strip()
+        logger.info(f"Intervention message ({language}): {text[:80]}...")
+        return text
+
+    except Exception as e:
+        logger.error(f"Intervention message generation failed: {e}")
+        return _fallback_intervention(trigger_reason, patient_name, language)
+
+
+def _fallback_intervention(trigger_reason: str, patient_name: str, language: str) -> str:
+    """Fallback intervention messages when Bedrock unavailable."""
+    if "1 year" in trigger_reason or "year" in trigger_reason.lower():
+        messages = {
+            "hi": f"{patient_name} aapka intezaar kar rahe hain. Ek saal ho gaya — kya aap is mahine donate kar sakte hain? Reply '1' karein.",
+            "en": f"{patient_name} is waiting for you. It has been a while -- can you donate this month? Reply '1' to confirm.",
+            "mr": f"{patient_name} tumchi vat pahat ahe. Ek varsha zhale -- ya mahinyat donate karta yeil ka? Reply '1' kara.",
+        }
+    else:
+        messages = {
+            "hi": f"Humne kai baar koshish ki -- {patient_name} ko abhi bhi aapki zaroorat hai. Kya aap is hafte upalabdh hain? Reply '1' karein.",
+            "en": f"We have tried reaching you -- {patient_name} still needs your help. Are you available this week? Reply '1' to confirm.",
+            "mr": f"Aamhi anekvela prayatna kela -- {patient_name} la aajhi tumchi garaj ahe. Ya aathavdyat upalabdh aahat ka? Reply '1' kara.",
+        }
+    return messages.get(language, messages.get("en", ""))
 
 
 async def classify_intent(text: str, language: str = "en") -> dict:

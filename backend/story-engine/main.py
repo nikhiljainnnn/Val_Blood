@@ -16,7 +16,7 @@ from sqlalchemy import select
 from shared.db import get_db, init_db
 from shared.models import PatientMilestone, Donor, Patient, GuardianCircle
 from shared.redis_client import get_redis
-from bedrock_client import generate_story, _fallback_story
+from bedrock_client import generate_story, generate_intervention_message, _fallback_story
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("story-engine")
@@ -95,6 +95,50 @@ async def record_milestone(body: dict, db: AsyncSession = Depends(get_db)):
         await redis.delete(*keys)
 
     return {"id": milestone.id, "status": "recorded"}
+
+
+@app.post("/intervention/generate")
+async def generate_intervention(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate a personalized WhatsApp re-engagement message for an at-risk donor.
+
+    Input:
+        { donor_id, trigger_reason, patient_name, language }
+
+    trigger_reason comes directly from inactive_trigger_comment in Dataset.csv:
+      - 'Not donated in last 1 year'
+      - 'Very limited activity despite multiple calls'
+
+    This endpoint is called by the Step Functions cascade (SendWhatsApp step)
+    to personalize every outreach message with the donor's specific inactivity reason.
+    """
+    donor_id      = body.get("donor_id", "")
+    trigger_reason = body.get(
+        "trigger_reason",
+        "Not donated in last 1 year"  # default to most common reason
+    )
+    patient_name  = body.get("patient_name", "your patient")
+    language      = body.get("language", "hi")
+
+    message = await generate_intervention_message(
+        donor_id=donor_id,
+        trigger_reason=trigger_reason,
+        patient_name=patient_name,
+        language=language,
+    )
+
+    return {
+        "donor_id":      donor_id,
+        "message":       message,
+        "channel":       "whatsapp",
+        "language":      language,
+        "trigger_reason": trigger_reason,
+        "generated_at":  datetime.utcnow().isoformat(),
+        "model":         "amazon.nova-micro-v1:0",
+    }
 
 
 async def _get_donation_number(donor_id: str, db: AsyncSession) -> int:

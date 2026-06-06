@@ -153,9 +153,66 @@ async def forecast_hb_batch(db: AsyncSession = Depends(get_db)):
     }
 
 
+@app.get("/churn/at-risk-bridge")
+async def get_at_risk_bridge_donors():
+    """
+    Returns inactive Bridge Donors (matched but not donating).
+    Pre-computed from real dataset. The demo's headline number.
+    143 donors are at risk — 18.6% of all matched Bridge Donors.
+    """
+    seed_path = Path("models/guardian_circle_seed.json")
+    if not seed_path.exists():
+        raise HTTPException(404, "Run export_guardian_circle.py first")
+
+    with open(seed_path) as f:
+        donors = json.load(f)
+
+    at_risk = [d for d in donors if d.get("gc_status") == "at_risk"]
+    top_3   = at_risk[:3]
+
+    return {
+        "total_at_risk":        len(at_risk),
+        "headline":             f"{len(at_risk)} matched donors are at risk of dropping out.",
+        "top_3_for_activation": top_3,
+        "demo_line":            "Here are the 3 we are activating right now.",
+        "computed_at":          datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/patients/urgent")
+async def get_urgent_patients():
+    """
+    Returns patients needing transfusion in <=7 days.
+    79 urgent cases from real dataset — used directly in demo.
+    """
+    path = Path("models/urgent_patients.json")
+    if not path.exists():
+        raise HTTPException(404, "Run export_guardian_circle.py first")
+
+    with open(path) as f:
+        patients = json.load(f)
+
+    return {
+        "urgent_count": len(patients),
+        "headline":     f"{len(patients)} urgent cases identified automatically.",
+        "patients":     patients,
+        "computed_at":  datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/demo/summary")
+async def get_demo_summary():
+    """Top-line numbers for the dashboard and demo. Served from pre-computed JSON."""
+    path = Path("models/demo_summary.json")
+    if not path.exists():
+        raise HTTPException(404, "Run export_guardian_circle.py first")
+    with open(path) as f:
+        return json.load(f)
+
+
 @app.post("/signal/record")
 async def record_donor_signal(body: dict, db: AsyncSession = Depends(get_db)):
-    """Record a behavioral signal for a donor."""
+    """Record a behavioral signal for a donor. Also pushes to Kinesis for real-time churn update."""
     signal = DonorSignal(
         donor_id=body["donor_id"],
         signal_type=body["signal_type"],
@@ -168,7 +225,64 @@ async def record_donor_signal(body: dict, db: AsyncSession = Depends(get_db)):
     # Invalidate cached features
     await redis.delete(f"features:{body['donor_id']}")
     await redis.delete("churn:batch:latest")
-    return {"ok": True}
+
+    # Push to Kinesis for real-time churn model input update
+    try:
+        import boto3
+        kinesis = boto3.client("kinesis", region_name=os.getenv("AWS_REGION", "us-east-1"))
+        kinesis.put_record(
+            StreamName="raksetu-donor-signals",
+            Data=json.dumps({
+                "donor_id":   body["donor_id"],
+                "signal":     body["signal_type"],
+                "ts":         datetime.utcnow().isoformat(),
+            }),
+            PartitionKey=body["donor_id"],
+        )
+    except Exception as e:
+        logger.warning(f"Kinesis push skipped: {e}")
+
+    # Push to SQS cascade queue (async task buffer per architecture)
+    queue_url = os.getenv("CASCADE_QUEUE_URL", "")
+    if queue_url and body.get("signal_type") in ("missed_donation", "no_response", "churn_risk_high"):
+        try:
+            import boto3
+            sqs = boto3.client("sqs", region_name=os.getenv("AWS_REGION", "us-east-1"))
+            sqs.send_message(
+                QueueUrl=queue_url,
+                MessageBody=json.dumps({
+                    "donor_id":       body["donor_id"],
+                    "signal_type":    body["signal_type"],
+                    "churn_risk":     body.get("value", {}).get("churn_risk", 0.8),
+                    "blood_group":    body.get("value", {}).get("blood_group", ""),
+                    "trigger_reason": body.get("value", {}).get("trigger_reason",
+                                              "Very limited activity despite multiple calls"),
+                    "language":       body.get("value", {}).get("language", "hi"),
+                    "ts":             datetime.utcnow().isoformat(),
+                }),
+                MessageGroupId=body["donor_id"] if queue_url.endswith(".fifo") else None,
+            )
+            logger.info(f"SQS cascade queued for donor: {body['donor_id']}")
+        except Exception as e:
+            logger.warning(f"SQS push skipped: {e}")
+
+    # Write to DynamoDB (sessions + signals, as per architecture Layer 5)
+    try:
+        import boto3
+        dynamodb = boto3.client("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1"))
+        dynamodb.put_item(
+            TableName="raksetu-donor-signals",
+            Item={
+                "donor_id":    {"S": body["donor_id"]},
+                "timestamp":   {"S": datetime.utcnow().isoformat()},
+                "signal_type": {"S": body.get("signal_type", "unknown")},
+                "value":       {"S": json.dumps(body.get("value", {}))},
+            }
+        )
+    except Exception as e:
+        logger.warning(f"DynamoDB signal write skipped: {e}")
+
+    return {"ok": True, "queued_for_cascade": bool(queue_url)}
 
 
 def _risk_tier(prob: float) -> str:

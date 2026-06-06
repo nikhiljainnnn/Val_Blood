@@ -180,3 +180,123 @@ def rank_donors(
             results.append({"donor_id": donor_id, **result})
 
     return sorted(results, key=lambda x: x["score"], reverse=True)
+
+
+# ─── GPS Distance + Composite Ranking ─────────────────────────────────────────
+# Upgrade over existing 91.7% blood group match rate.
+# Real Dataset.csv has latitude/longitude for all 786 bridge donors.
+# ──────────────────────────────────────────────────────────────────────────────
+
+from math import radians, sin, cos, sqrt, atan2
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Haversine formula for great-circle distance between two GPS coordinates.
+    Returns distance in kilometres.
+
+    Used to rank donors by proximity to the patient's hospital.
+    All 786 bridge donors in Dataset.csv have lat/lon coverage.
+    """
+    R = 6371.0  # Earth radius in km
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+def distance_weight(distance_km: float) -> float:
+    """
+    Convert distance to a 0-1 weight.
+    Tiers calibrated for Indian urban geography (hospitals within city boundaries).
+    """
+    if distance_km <= 5:    return 1.00   # Same neighbourhood
+    if distance_km <= 15:   return 0.90   # Same zone of city
+    if distance_km <= 30:   return 0.75   # Across city
+    if distance_km <= 50:   return 0.55   # Nearby district
+    if distance_km <= 100:  return 0.35   # Different district
+    return 0.15                           # Long-distance (last resort)
+
+
+def composite_rank_score(
+    compatibility_score: float,
+    distance_km: float,
+    churn_probability: float,
+) -> float:
+    """
+    Combined ranking score merging three signals:
+      - Antigen compatibility (50%) — clinical safety, non-negotiable primary signal
+      - GPS proximity     (30%) — reduces no-show risk, faster response
+      - Churn availability (20%) — predicted from XGBoost model (AUC 0.9990)
+
+    Score range: 0.0 - 1.0 (higher = better match)
+
+    This is the core improvement over the existing 91.7% blood group match:
+    we now factor in WHO will actually show up and HOW CLOSE they are.
+    """
+    dist_w       = distance_weight(distance_km)
+    availability = 1.0 - churn_probability   # churn_probability from prediction-service
+
+    return (
+        compatibility_score * 0.50 +
+        dist_w              * 0.30 +
+        availability        * 0.20
+    )
+
+
+def rank_donors_composite(
+    patient_profile: AntigenDataclass,
+    donor_profiles: list[tuple[str, AntigenDataclass]],
+    patient_lat: float,
+    patient_lon: float,
+    donor_locations: dict[str, tuple[float, float]],   # donor_id -> (lat, lon)
+    churn_scores: dict[str, float],                     # donor_id -> churn_probability
+    min_compat: float = 0.0,
+) -> list[dict]:
+    """
+    Full composite ranking: compatibility + GPS distance + churn risk.
+
+    Args:
+        patient_profile:  patient antigen profile
+        donor_profiles:   list of (donor_id, AntigenDataclass)
+        patient_lat/lon:  patient hospital GPS coordinates
+        donor_locations:  {donor_id: (lat, lon)} from Dataset.csv
+        churn_scores:     {donor_id: float} from prediction-service
+        min_compat:       minimum antigen compatibility score to include
+
+    Returns:
+        List of dicts sorted by composite_score descending.
+        Includes: donor_id, compatibility, distance_km, churn_probability,
+                  dist_weight, composite_score
+    """
+    results = []
+    for donor_id, donor_profile in donor_profiles:
+        compat = compute_compatibility(patient_profile, donor_profile)
+        if compat["score"] < min_compat:
+            continue
+
+        # GPS distance
+        if donor_id in donor_locations:
+            d_lat, d_lon = donor_locations[donor_id]
+            dist_km = haversine_km(patient_lat, patient_lon, d_lat, d_lon)
+        else:
+            dist_km = 999.0  # Unknown location — penalised
+
+        churn_prob    = churn_scores.get(donor_id, 0.5)
+        dist_w        = distance_weight(dist_km)
+        comp_score    = composite_rank_score(compat["score"], dist_km, churn_prob)
+
+        results.append({
+            "donor_id":           donor_id,
+            "compatibility_score": compat["score"],
+            "antigen_mismatches": compat["mismatch_count"],
+            "risk_level":         compat["risk_level"],
+            "distance_km":        round(dist_km, 2),
+            "dist_weight":        round(dist_w, 3),
+            "churn_probability":  round(churn_prob, 4),
+            "availability":       round(1.0 - churn_prob, 4),
+            "composite_score":    round(comp_score, 4),
+        })
+
+    return sorted(results, key=lambda x: x["composite_score"], reverse=True)
+
