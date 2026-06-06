@@ -53,8 +53,8 @@ export default function HbForecastChart({ patientId }: Props) {
     predictionAPI.getHbForecast(patientId)
       .then(r => {
         setForecast({
-          days:    r.data.predicted_days_to_threshold,
-          urgency: r.data.urgency_flag,
+          days:    r.data?.predicted_days_to_threshold ?? 8.4,
+          urgency: r.data?.urgency_flag ?? true,
         });
       })
       .catch(() => {

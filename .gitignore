@@ -72,3 +72,13 @@ htmlcov/
 
 # Logs
 *.log
+
+# SSH Keys & AWS Credentials
+*.pem
+*.cer
+*.key
+credentials.csv
+
+# PyTorch Checkpoints
+*.pt
+*.pth

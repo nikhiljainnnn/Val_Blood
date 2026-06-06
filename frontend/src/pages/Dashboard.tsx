@@ -52,7 +52,7 @@ export default function Dashboard() {
     import("../api/client").then(({ demoAPI }) => {
       demoAPI.getDemoSummary()
         .then(r => {
-          const hl = r.data.headline_numbers;
+          const hl = r.data?.headline_numbers || {};
           setStatsData({
             active_patients: hl.total_patients || 487,
             active_donors: hl.active_bridge_donors || 4218,

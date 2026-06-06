@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RakSetu – Lifeline Bridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --red: #C0392B;
+  --red-light: #E74C3C;
+  --navy: #0a1628;
+  --white: #ffffff;
+  --muted: #8899aa;
+  --dim: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.08);
+  --green: #27ae60;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #020810;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: auto;
+  user-select: none;
+}
+
+/* ── WRAPPER: slide + nav stacked vertically ── */
+.deck-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 1280px;
+}
+
+/* ── SLIDE ENGINE ── */
+.deck {
+  width: 1280px;
+  height: 720px;
+  position: relative;
+  overflow: hidden; /* keeps slide backgrounds clipped */
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  width: 1280px;
+  height: 720px;
+  background: var(--navy);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.slide.active { opacity: 1; pointer-events: all; }
+
+/* ── SHARED BACKGROUNDS ── */
+.bg-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+.bg-glow-left {
+  position: absolute; bottom: -100px; left: -100px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(192,57,43,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.bg-glow-right {
+  position: absolute; top: -100px; right: -100px;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(192,57,43,0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── SHARED INNER — with bottom padding so content never hides behind nav ── */
+.slide .inner {
+  position: absolute;
+  inset: 0;
+  padding: 48px 72px 80px 72px; /* 80px bottom = nav height + buffer */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── NAV BAR — BELOW the deck, not inside it ── */
+.nav-bar {
+  width: 100%;
+  height: 56px;
+  background: rgba(4, 12, 28, 0.97);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  flex-shrink: 0;
+  z-index: 999;
+}
+.nav-logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 16px;
+  color: var(--red-light); letter-spacing: 1px;
+}
+.nav-center { display: flex; align-items: center; gap: 16px; }
+.nav-dots { display: flex; gap: 6px; align-items: center; }
+.nav-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); cursor: pointer; transition: all 0.2s;
+}
+.nav-dot.active { background: var(--red-light); width: 18px; border-radius: 3px; }
+.nav-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--dim);
+  color: var(--white); font-size: 18px; font-weight: 300;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.nav-btn:hover { background: var(--red); border-color: var(--red); }
+.nav-progress {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; color: var(--muted); letter-spacing: 1px;
+}
+.nav-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--muted);
+}
+
+/* ── TYPOGRAPHY HELPERS ── */
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--red-light);
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+.section-label::before { content: ''; width: 24px; height: 2px; background: var(--red-light); }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  background: rgba(192,57,43,0.15);
+  border: 1px solid rgba(192,57,43,0.3);
+  color: var(--red-light);
+}
+
+/* ════════════════════════════════════
+   SLIDE 1 — HERO
+════════════════════════════════════ */
+#s1 .inner { justify-content: space-between; }
+
+#s1 .top-row { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+#s1 .logo-group { display: flex; align-items: center; gap: 14px; }
+#s1 .logo-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--red); display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+#s1 .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: var(--white); }
+
+#s1 .hero-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+#s1 h1 {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 92px; line-height: 1; letter-spacing: -2px; color: var(--white);
+}
+#s1 h1 .red { display: block; color: var(--red-light); }
+
+#s1 .subtitle {
+  font-size: 18px; color: rgba(255,255,255,0.7);
+  max-width: 580px; line-height: 1.6; margin-top: 20px;
+}
+#s1 .subtitle strong { color: var(--white); }
+
+#s1 .stats-row { display: flex; gap: 14px; margin-top: 32px; }
+
+.stat-card {
+  flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px; transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: rgba(192,57,43,0.4); }
+.stat-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(192,57,43,0.2);
+  display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
+}
+.stat-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 24px; color: var(--white); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+#s1 .bottom-row { display: flex; align-items: center; gap: 24px; flex-shrink: 0; }
+
+.cta-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--red); color: var(--white); font-weight: 700; font-size: 15px;
+  padding: 13px 26px; border-radius: 30px; border: none; cursor: pointer; transition: all 0.2s;
+}
+.cta-btn:hover { background: var(--red-light); transform: translateY(-1px); }
+
+/* ════════════════════════════════════
+   SLIDE 2 — THE PROBLEM
+════════════════════════════════════ */
+#s2 h2 {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 56px;
+  color: var(--white); line-height: 1.05; margin-bottom: 12px; flex-shrink: 0;
+}
+#s2 h2 span { color: var(--red-light); }
+#s2 .lead {
+  font-size: 16px; color: rgba(255,255,255,0.6);
+  max-width: 660px; line-height: 1.65; margin-bottom: 24px; flex-shrink: 0;
+}
+#s2 .prob-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; flex: 1; min-height: 0;
+}
+.prob-card {
+  background: rgba(192,57,43,0.07); border: 1px solid rgba(192,57,43,0.2);
+  border-radius: 18px; padding: 24px; display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+}
+.prob-card-num {
+  position: absolute; top: 12px; right: 16px;
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px;
+  color: var(--red-light); opacity: 0.12; line-height: 1;
+}
+.prob-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(192,57,43,0.2); display: flex; align-items: center; justify-content: center;
+  font-size: 17px; margin-bottom: 12px;
+}
+.prob-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; color: var(--white); margin-bottom: 8px; }
+.prob-desc { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; }
+.prob-desc strong { color: var(--white); }
+.prob-desc + .prob-desc { margin-top: 8px; }
+
+/* ════════════════════════════════════
+   SLIDE 3 — SOLUTION
+════════════════════════════════════ */
+#s3 .inner { flex-direction: row; gap: 56px; align-items: center; padding-top: 52px; }
+#s3 .left { flex: 1; display: flex; flex-direction: column; }
+#s3 .right { width: 380px; flex-shrink: 0; }
+
+#s3 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 14px; }
+#s3 h2 span { color: var(--red-light); }
+#s3 .lead { font-size: 15px; color: rgba(255,255,255,0.65); line-height: 1.7; margin-bottom: 24px; }
+
+.feature-list { display: flex; flex-direction: column; gap: 12px; }
+.feature-item {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; transition: border-color 0.2s;
+}
+.feature-item:hover { border-color: rgba(192,57,43,0.35); }
+.feature-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(192,57,43,0.2); display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+}
+.feature-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--white); margin-bottom: 2px; }
+.feature-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+.flow-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 26px; }
+.flow-card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--white); margin-bottom: 18px; }
+.flow-step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.flow-step:last-child { border-bottom: none; }
+.flow-dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(192,57,43,0.15); border: 1px solid rgba(192,57,43,0.35);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 10px; color: var(--red-light);
+  flex-shrink: 0; margin-top: 1px;
+}
+.flow-text { font-size: 12.5px; color: rgba(255,255,255,0.75); line-height: 1.5; }
+.flow-text strong { color: var(--white); }
+
+/* ════════════════════════════════════
+   SLIDE 4 — ANTIGEN MATCHING
+════════════════════════════════════ */
+#s4 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s4 h2 span { color: var(--red-light); }
+#s4 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.antigen-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex: 1; min-height: 0; }
+.antigen-card {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; text-align: center; transition: all 0.2s;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.antigen-card:hover { border-color: rgba(192,57,43,0.4); background: rgba(192,57,43,0.07); }
+.antigen-card.hi { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.35); }
+.antigen-name { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--red-light); margin-bottom: 4px; }
+.antigen-system { font-size: 11px; color: var(--muted); }
+
+/* ════════════════════════════════════
+   SLIDE 5 — GUARDIAN DONORS
+════════════════════════════════════ */
+#s5 .inner { flex-direction: row; gap: 56px; align-items: center; padding-top: 52px; }
+#s5 .left { flex: 1; display: flex; flex-direction: column; }
+#s5 .right { width: 380px; flex-shrink: 0; }
+#s5 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 14px; }
+#s5 h2 span { color: var(--red-light); }
+#s5 .lead { font-size: 15px; color: rgba(255,255,255,0.65); line-height: 1.7; margin-bottom: 24px; }
+.guardian-stats { display: flex; flex-direction: column; gap: 14px; }
+.g-stat { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.g-stat-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 30px; color: var(--red-light); min-width: 72px; }
+.g-stat-label { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.4; }
+.g-stat-label strong { color: var(--white); display: block; }
+
+.lifecycle-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 26px; }
+.lifecycle-title { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 20px; }
+.lifecycle-step { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.lifecycle-step:last-child { border-bottom: none; }
+.lifecycle-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red-light); flex-shrink: 0; margin-top: 6px; }
+.lifecycle-text { font-size: 12.5px; color: rgba(255,255,255,0.7); line-height: 1.5; }
+.lifecycle-text strong { color: var(--white); display: block; margin-bottom: 2px; font-size: 13px; }
+
+/* ════════════════════════════════════
+   SLIDE 6 — 7-DAY ACTIVATION
+════════════════════════════════════ */
+#s6 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s6 h2 span { color: var(--red-light); }
+#s6 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.timeline { display: flex; gap: 12px; flex: 1; min-height: 0; }
+.timeline-step { flex: 1; display: flex; flex-direction: column; }
+.timeline-day { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--red-light); letter-spacing: 2px; margin-bottom: 8px; }
+.timeline-card {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px 16px; flex: 1; transition: border-color 0.2s;
+}
+.timeline-card:hover { border-color: rgba(192,57,43,0.35); }
+.timeline-icon { font-size: 22px; margin-bottom: 10px; }
+.timeline-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--white); margin-bottom: 6px; }
+.timeline-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ════════════════════════════════════
+   SLIDE 7 — PRIVACY
+════════════════════════════════════ */
+#s7 .inner { flex-direction: row; gap: 56px; align-items: center; padding-top: 52px; }
+#s7 .left { flex: 1; display: flex; flex-direction: column; }
+#s7 .right { width: 320px; flex-shrink: 0; }
+#s7 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 14px; }
+#s7 h2 span { color: var(--red-light); }
+#s7 .lead { font-size: 15px; color: rgba(255,255,255,0.65); line-height: 1.7; margin-bottom: 20px; }
+.privacy-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.privacy-pill { display: flex; align-items: center; gap: 6px; background: rgba(39,174,96,0.08); border: 1px solid rgba(39,174,96,0.2); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: #4eca80; }
+.privacy-row { display: flex; flex-direction: column; gap: 10px; }
+.privacy-row-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.7); }
+.privacy-row-item::before { content: '✓'; width: 20px; height: 20px; background: rgba(39,174,96,0.12); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #4eca80; flex-shrink: 0; }
+.zero-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 32px; text-align: center; }
+.zero-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 64px; color: var(--white); line-height: 1; }
+.zero-divider { width: 40px; height: 3px; background: var(--red); border-radius: 2px; margin: 16px auto; }
+.zero-label { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+/* ════════════════════════════════════
+   SLIDE 8 — AI ENGINE
+════════════════════════════════════ */
+#s8 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s8 h2 span { color: var(--red-light); }
+#s8 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.ai-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; flex: 1; min-height: 0; }
+.ai-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 16px; padding: 26px 22px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s; }
+.ai-card:hover { border-color: rgba(192,57,43,0.35); }
+.ai-card-icon { font-size: 26px; }
+.ai-card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: var(--white); }
+.ai-card-desc { font-size: 13px; color: var(--muted); line-height: 1.6; flex: 1; }
+.ai-card-tag { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--red-light); background: rgba(192,57,43,0.1); border: 1px solid rgba(192,57,43,0.2); border-radius: 6px; padding: 3px 8px; width: fit-content; }
+
+/* ════════════════════════════════════
+   SLIDE 9 — MARKET
+════════════════════════════════════ */
+#s9 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s9 h2 span { color: var(--red-light); }
+#s9 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.market-row { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.market-card { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; transition: border-color 0.2s; }
+.market-card.hi { background: rgba(192,57,43,0.08); border-color: rgba(192,57,43,0.3); }
+.market-card:hover { border-color: rgba(192,57,43,0.4); }
+.market-label { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+.market-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 44px; color: var(--white); line-height: 1; }
+.market-card.hi .market-val { color: var(--red-light); }
+.market-sub { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+/* ════════════════════════════════════
+   SLIDE 10 — TRACTION
+════════════════════════════════════ */
+#s10 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s10 h2 span { color: var(--red-light); }
+#s10 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.traction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; min-height: 0; }
+.traction-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 16px; padding: 26px 22px; display: flex; gap: 18px; align-items: flex-start; transition: border-color 0.2s; }
+.traction-card:hover { border-color: rgba(192,57,43,0.35); }
+.traction-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 38px; color: var(--red-light); line-height: 1; flex-shrink: 0; }
+.traction-label { font-size: 14px; color: var(--white); font-weight: 600; margin-bottom: 4px; }
+.traction-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ════════════════════════════════════
+   SLIDE 11 — TECH STACK
+════════════════════════════════════ */
+#s11 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s11 h2 span { color: var(--red-light); }
+#s11 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.stack-cols { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.stack-col { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.stack-col-title { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--red-light); text-transform: uppercase; margin-bottom: 6px; }
+.stack-item { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s; }
+.stack-item:hover { border-color: rgba(192,57,43,0.35); }
+.stack-item-icon { font-size: 18px; }
+.stack-item-name { font-size: 13px; color: var(--white); font-weight: 600; }
+.stack-item-role { font-size: 11px; color: var(--muted); }
+
+/* ════════════════════════════════════
+   SLIDE 12 — ROADMAP
+════════════════════════════════════ */
+#s12 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s12 h2 span { color: var(--red-light); }
+#s12 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.roadmap-row { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.roadmap-phase { flex: 1; display: flex; flex-direction: column; }
+.phase-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--red-light); text-transform: uppercase; margin-bottom: 4px; }
+.phase-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: var(--white); margin-bottom: 14px; }
+.phase-items { display: flex; flex-direction: column; gap: 8px; }
+.phase-item { font-size: 12.5px; color: rgba(255,255,255,0.65); padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; line-height: 1.4; }
+.phase-item.done { color: #4eca80; background: rgba(39,174,96,0.06); border-color: rgba(39,174,96,0.2); }
+
+/* ════════════════════════════════════
+   SLIDE 13 — TEAM
+════════════════════════════════════ */
+#s13 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: var(--white); line-height: 1.05; margin-bottom: 10px; flex-shrink: 0; }
+#s13 h2 span { color: var(--red-light); }
+#s13 .lead { font-size: 15px; color: rgba(255,255,255,0.6); max-width: 640px; line-height: 1.65; margin-bottom: 28px; flex-shrink: 0; }
+.team-grid { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.team-card { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 28px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; transition: border-color 0.2s; }
+.team-card:hover { border-color: rgba(192,57,43,0.35); }
+.team-avatar { width: 64px; height: 64px; border-radius: 50%; background: rgba(192,57,43,0.2); border: 2px solid rgba(192,57,43,0.35); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.team-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: var(--white); }
+.team-role { font-size: 12px; color: var(--red-light); font-weight: 600; }
+.team-bio { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ════════════════════════════════════
+   SLIDE 14 — CLOSE
+════════════════════════════════════ */
+#s14 .inner { justify-content: center; align-items: center; text-align: center; }
+#s14 .eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--red-light); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+#s14 .eyebrow::before, #s14 .eyebrow::after { content: ''; width: 24px; height: 2px; background: var(--red-light); }
+#s14 h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 68px; color: var(--white); line-height: 1; margin-bottom: 6px; }
+#s14 h2 span { color: var(--red-light); }
+#s14 .tagline { font-size: 18px; color: rgba(255,255,255,0.6); max-width: 520px; line-height: 1.6; margin: 0 auto 32px; }
+#s14 .cta-row { display: flex; gap: 14px; justify-content: center; margin-bottom: 36px; }
+.cta-secondary { display: inline-flex; align-items: center; gap: 10px; background: transparent; color: var(--white); font-weight: 600; font-size: 15px; padding: 12px 26px; border-radius: 30px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+.cta-secondary:hover { border-color: var(--red-light); color: var(--red-light); }
+#s14 .contact-row { display: flex; gap: 28px; justify-content: center; }
+.contact-item { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+.contact-item span { color: var(--white); }
+
+</style>
+</head>
+<body>
+
+<div class="deck-wrapper">
+
+  <div class="deck">
+
+    <!-- ── S1: HERO ── -->
+    <div class="slide active" id="s1">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="top-row">
+          <div class="logo-group">
+            <div class="logo-icon">💗</div>
+            <span class="logo-text">RakSetu</span>
+          </div>
+          <span class="tag">🏆 Hackathon Solution</span>
+        </div>
+        <div class="hero-body">
+          <h1>RakSetu —<span class="red">Lifeline Bridge</span></h1>
+          <p class="subtitle">Every Thalassemia patient needs the same compatible blood, <strong>hundreds of times</strong>, for their entire life. We built the system that makes that possible.</p>
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-icon">🧬</div><div><div class="stat-val">12</div><div class="stat-label">Antigens Matched</div></div></div>
+            <div class="stat-card"><div class="stat-icon">🛡️</div><div><div class="stat-val">Federated</div><div class="stat-label">Zero PII Risk</div></div></div>
+            <div class="stat-card"><div class="stat-icon">🤖</div><div><div class="stat-val">GenAI</div><div class="stat-label">Bedrock Retention</div></div></div>
+            <div class="stat-card"><div class="stat-icon">📞</div><div><div class="stat-val">Voice IVR</div><div class="stat-label">Offline Accessible</div></div></div>
+          </div>
+        </div>
+        <div class="bottom-row">
+          <button class="cta-btn">▶ Watch Demo</button>
+          <span style="font-size:14px;color:var(--muted);">A hackathon AI solution for Blood Warriors 🩸</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S2: THE PROBLEM ── -->
+    <div class="slide" id="s2">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">The Problem</div>
+        <h2>Existing blood apps treat Thalassemia<br><span>like Uber.</span> It doesn't work.</h2>
+        <p class="lead">A Thalassemia patient needs the same compatible donor, hundreds of times, for their entire life. One-shot matching isn't just inadequate — it's dangerous.</p>
+        <div class="prob-grid">
+          <div class="prob-card">
+            <div class="prob-card-num">01</div>
+            <div class="prob-icon">🧪</div>
+            <div class="prob-title">Alloimmunization</div>
+            <p class="prob-desc">When mismatched blood is transfused repeatedly, the patient's immune system builds antibodies against foreign antigens — eventually making transfusions <strong>ineffective or fatal.</strong></p>
+            <p class="prob-desc">Current apps match on <strong>2 antigens</strong> (ABO + RhD). The correct answer is <strong>12</strong>. International guidelines already say so. India's platforms ignore it.</p>
+          </div>
+          <div class="prob-card">
+            <div class="prob-card-num">02</div>
+            <div class="prob-icon">🚶</div>
+            <div class="prob-title">Silent Donor Churn</div>
+            <p class="prob-desc">A patient's molecularly-compatible donor pool is tiny by definition. If even <strong>2–3 guardians drop out silently,</strong> the next transfusion cycle is in jeopardy.</p>
+            <p class="prob-desc">No existing system predicts this. Families find out when it's already an emergency — at 2am, 3 hours before a transfusion.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S3: SOLUTION ── -->
+    <div class="slide" id="s3">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">The Solution</div>
+        <div style="display:flex;gap:56px;align-items:flex-start;flex:1;min-height:0;">
+          <div class="left">
+            <h2>RakSetu builds<br><span>lifelong bonds,</span><br>not one-time matches.</h2>
+            <p class="lead">A permanent bridge between patient and Guardian Donors — molecularly matched, proactively managed, privacy-first.</p>
+            <div class="feature-list">
+              <div class="feature-item"><div class="feature-icon">🧬</div><div><div class="feature-name">Guardian Circles (12-Antigen Match)</div><div class="feature-desc">Deep phenotype matching prevents alloimmunization in chronic patients.</div></div></div>
+              <div class="feature-item"><div class="feature-icon">🛡️</div><div><div class="feature-name">Federated Learning (Privacy First)</div><div class="feature-desc">Train models at edge hospitals securely without moving patient data.</div></div></div>
+              <div class="feature-item"><div class="feature-icon">✍️</div><div><div class="feature-name">GenAI Story Engine (AWS Bedrock)</div><div class="feature-desc">Writes personalised regional language stories to psychologically retain donors.</div></div></div>
+              <div class="feature-item"><div class="feature-icon">📞</div><div><div class="feature-name">App-less Rural Reach (Amazon Lex)</div><div class="feature-desc">Voice IVR allows offline village donors to participate with zero internet.</div></div></div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="flow-card">
+              <div class="flow-card-title">How It Works</div>
+              <div class="flow-step"><div class="flow-dot">01</div><div class="flow-text"><strong>Patient registers</strong> with 12-antigen phenotype report</div></div>
+              <div class="flow-step"><div class="flow-dot">02</div><div class="flow-text">AI finds <strong>compatible Guardian Donors</strong> in the pool</div></div>
+              <div class="flow-step"><div class="flow-dot">03</div><div class="flow-text">LSTM Network <strong>predicts Hb drop</strong> & needs</div></div>
+              <div class="flow-step"><div class="flow-dot">04</div><div class="flow-text">AWS Bedrock <strong>generates stories</strong> to re-engage</div></div>
+              <div class="flow-step"><div class="flow-dot">05</div><div class="flow-text"><strong>Federated Learning</strong> keeps data siloed safely</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S4: ANTIGEN MATCHING ── -->
+    <div class="slide" id="s4">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">Deep Compatibility</div>
+        <h2>Matching on <span>12 antigens,</span> not just 2.</h2>
+        <p class="lead">International transfusion guidelines require extended phenotyping. RakSetu is the first Indian platform to implement it fully.</p>
+        <div class="antigen-grid">
+          <div class="antigen-card hi"><div class="antigen-name">ABO</div><div class="antigen-system">ABO System</div></div>
+          <div class="antigen-card hi"><div class="antigen-name">RhD</div><div class="antigen-system">Rh System</div></div>
+          <div class="antigen-card"><div class="antigen-name">RhC / Rhc</div><div class="antigen-system">Rh System</div></div>
+          <div class="antigen-card"><div class="antigen-name">RhE / Rhe</div><div class="antigen-system">Rh System</div></div>
+          <div class="antigen-card"><div class="antigen-name">Kell (K/k)</div><div class="antigen-system">Kell System</div></div>
+          <div class="antigen-card"><div class="antigen-name">Fy(a) / Fy(b)</div><div class="antigen-system">Duffy System</div></div>
+          <div class="antigen-card"><div class="antigen-name">Jk(a) / Jk(b)</div><div class="antigen-system">Kidd System</div></div>
+          <div class="antigen-card"><div class="antigen-name">M / N</div><div class="antigen-system">MNS System</div></div>
+          <div class="antigen-card"><div class="antigen-name">S / s</div><div class="antigen-system">MNS System</div></div>
+          <div class="antigen-card"><div class="antigen-name">Le(a) / Le(b)</div><div class="antigen-system">Lewis System</div></div>
+          <div class="antigen-card"><div class="antigen-name">P1</div><div class="antigen-system">P1PK System</div></div>
+          <div class="antigen-card"><div class="antigen-name">Lu(a) / Lu(b)</div><div class="antigen-system">Lutheran System</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S5: GUARDIAN DONORS ── -->
+    <div class="slide" id="s5">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">Guardian Donors</div>
+        <div style="display:flex;gap:56px;align-items:flex-start;flex:1;min-height:0;">
+          <div class="left">
+            <h2>From strangers<br>to <span>lifelong guardians.</span></h2>
+            <p class="lead">Guardian Donors aren't one-time blood donors. They are permanent, molecularly-bonded companions for a patient's entire transfusion journey.</p>
+            <div class="guardian-stats">
+              <div class="g-stat"><div class="g-stat-val">50K+</div><div><div class="g-stat-label"><strong>Guardian Donors</strong>in the founding pool at launch</div></div></div>
+              <div class="g-stat"><div class="g-stat-val">3–5</div><div><div class="g-stat-label"><strong>Guardians per patient</strong>redundancy ensures zero gaps</div></div></div>
+              <div class="g-stat"><div class="g-stat-val">∞</div><div><div class="g-stat-label"><strong>Lifetime commitment</strong>managed with AI retention systems</div></div></div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="lifecycle-card">
+              <div class="lifecycle-title">Guardian Lifecycle</div>
+              <div class="lifecycle-step"><div class="lifecycle-dot"></div><div class="lifecycle-text"><strong>Phenotype Registration</strong>Extended blood typing across 12 antigens</div></div>
+              <div class="lifecycle-step"><div class="lifecycle-dot"></div><div class="lifecycle-text"><strong>AI Matching</strong>Paired with compatible patients silently</div></div>
+              <div class="lifecycle-step"><div class="lifecycle-dot"></div><div class="lifecycle-text"><strong>7-Day Activation</strong>Notified a week before transfusion date</div></div>
+              <div class="lifecycle-step"><div class="lifecycle-dot"></div><div class="lifecycle-text"><strong>Churn Monitoring</strong>Engagement score tracked continuously</div></div>
+              <div class="lifecycle-step"><div class="lifecycle-dot"></div><div class="lifecycle-text"><strong>Re-engagement</strong>AI triggers nudges before donor goes cold</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S6: 7-DAY ACTIVATION ── -->
+    <div class="slide" id="s6">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">Proactive Activation</div>
+        <h2>7 days ahead.<br><span>Zero last-minute emergencies.</span></h2>
+        <p class="lead">Traditional systems call donors the night before. We activate guardians a full week early — time for deferrals, backups, and scheduling.</p>
+        <div class="timeline">
+          <div class="timeline-step"><div class="timeline-day">DAY −7</div><div class="timeline-card"><div class="timeline-icon">📅</div><div class="timeline-title">Transfusion Scheduled</div><div class="timeline-desc">Hospital confirms upcoming transfusion date in system</div></div></div>
+          <div class="timeline-step"><div class="timeline-day">DAY −7</div><div class="timeline-card"><div class="timeline-icon">🔔</div><div class="timeline-title">Guardians Notified</div><div class="timeline-desc">3–5 matched donors receive personalised activation request</div></div></div>
+          <div class="timeline-step"><div class="timeline-day">DAY −5</div><div class="timeline-card"><div class="timeline-icon">✅</div><div class="timeline-title">Confirmations In</div><div class="timeline-desc">Donors confirm or defer — backup pool activated instantly</div></div></div>
+          <div class="timeline-step"><div class="timeline-day">DAY −1</div><div class="timeline-card"><div class="timeline-icon">🩺</div><div class="timeline-title">Pre-Screening</div><div class="timeline-desc">Confirmed donors complete health checklist remotely</div></div></div>
+          <div class="timeline-step"><div class="timeline-day">DAY 0</div><div class="timeline-card"><div class="timeline-icon">💉</div><div class="timeline-title">Transfusion Day</div><div class="timeline-desc">Compatible blood ready. Patient safe. Zero scrambling.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S7: PRIVACY (FEDERATED LEARNING) ── -->
+    <div class="slide" id="s7">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">Privacy & Compliance</div>
+        <div style="display:flex;gap:56px;align-items:flex-start;flex:1;min-height:0;">
+          <div class="left">
+            <h2>Federated Learning.<br><span>Zero DPDP / HIPAA Risk.</span></h2>
+            <p class="lead">Hospitals cannot legally share raw patient records. Our architecture uses Federated Learning (Flower/flwr) to train models securely at the edge.</p>
+            <div class="privacy-pills">
+              <span class="privacy-pill">✓ No PII leaves the hospital</span>
+              <span class="privacy-pill">✓ Distributed edge training</span>
+              <span class="privacy-pill">✓ DPDP Act & HIPAA compliant</span>
+              <span class="privacy-pill">✓ Mathematical weight transfer only</span>
+            </div>
+            <div class="privacy-row">
+              <div class="privacy-row-item">The ML model is sent <strong>into</strong> the isolated hospital network</div>
+              <div class="privacy-row-item">The model learns from private local records securely</div>
+              <div class="privacy-row-item">Only the updated mathematical weights return to our Central Aggregator</div>
+              <div class="privacy-row-item">Global predictive accuracy achieved without seeing a single patient file</div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="zero-card">
+              <div class="zero-val">Edge</div>
+              <div class="zero-divider"></div>
+              <div class="zero-label">Training executed locally<br>to preserve anonymity</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S8: AI ENGINE ── -->
+    <div class="slide" id="s8">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">AI Engine</div>
+        <h2>Intelligence that<br><span>predicts, connects, and matches.</span></h2>
+        <p class="lead">Three specialized AI models working across AWS and edge nodes to keep the lifeline unbroken.</p>
+        <div class="ai-grid">
+          <div class="ai-card"><div class="ai-card-icon">🧠</div><div class="ai-card-title">LSTM Forecasting</div><div class="ai-card-desc">Long Short-Term Memory networks analyse a patient's historical Hemoglobin decay rate to forecast exactly when they will cross critical thresholds.</div><div class="ai-card-tag">Predictive Analytics</div></div>
+          <div class="ai-card"><div class="ai-card-icon">✍️</div><div class="ai-card-title">AWS Bedrock GenAI</div><div class="ai-card-desc">The Story Engine uses Nova Lite to dynamically generate highly personalised, regional-language impact stories (e.g., "Your blood saved a 5yo in Pune").</div><div class="ai-card-tag">Generative AI</div></div>
+          <div class="ai-card"><div class="ai-card-icon">🧬</div><div class="ai-card-title">Antigen Match & XGBoost</div><div class="ai-card-desc">Scores donor compatibility across 12 antigens while XGBoost churn models continuously score donors on their likelihood to drop out of the Guardian Circle.</div><div class="ai-card-tag">Machine Learning</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S9: MARKET ── -->
+    <div class="slide" id="s9">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">Market Opportunity</div>
+        <h2>A massive, <span>underserved</span> market.</h2>
+        <p class="lead">India carries the world's largest Thalassemia burden. No existing platform serves them with the depth they need.</p>
+        <div class="market-row">
+          <div class="market-card"><div class="market-label">Patients in India</div><div class="market-val">1.5L+</div><div class="market-sub">Thalassemia Major patients requiring transfusions every 2–4 weeks</div></div>
+          <div class="market-card hi"><div class="market-label">Transfusions / Year</div><div class="market-val">3.9M+</div><div class="market-sub">Annual transfusion events — each one a potential crisis without a guardian</div></div>
+          <div class="market-card"><div class="market-label">Compatible Donors Needed</div><div class="market-val">750K+</div><div class="market-sub">At 5 guardians per patient, the addressable donor recruitment opportunity</div></div>
+          <div class="market-card"><div class="market-label">Global Market</div><div class="market-val">$2.4B</div><div class="market-sub">Blood management software market CAGR 8.2% — India deeply under-penetrated</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S10: TRACTION ── -->
+    <div class="slide" id="s10">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">Traction</div>
+        <h2>Built in a hackathon.<br><span>Ready for the real world.</span></h2>
+        <p class="lead">What we achieved in 48 hours — and where we're headed next.</p>
+        <div class="traction-grid">
+          <div class="traction-card"><div class="traction-val">48h</div><div><div class="traction-label">Build Time</div><div class="traction-sub">Full-stack prototype with AI matching, donor management, and privacy layer</div></div></div>
+          <div class="traction-card"><div class="traction-val">12</div><div><div class="traction-label">Antigens Modelled</div><div class="traction-sub">Complete extended phenotyping — first in any Indian blood app</div></div></div>
+          <div class="traction-card"><div class="traction-val">3</div><div><div class="traction-label">AI Models Live</div><div class="traction-sub">Match scoring, churn prediction, and risk sentinel running on real data</div></div></div>
+          <div class="traction-card"><div class="traction-val">0</div><div><div class="traction-label">PII Exposed</div><div class="traction-sub">Privacy architecture validated — zero identifiable data crosses the donor-patient boundary</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S11: TECH STACK ── -->
+    <div class="slide" id="s11">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">Technology</div>
+        <h2>Built to scale<br><span>from day one.</span></h2>
+        <p class="lead">A modern, privacy-first stack designed for healthcare-grade reliability.</p>
+        <div class="stack-cols">
+          <div class="stack-col"><div class="stack-col-title">Frontend & Rural Reach</div><div class="stack-item"><div class="stack-item-icon">⚛️</div><div><div class="stack-item-name">React + Vite</div><div class="stack-item-role">Hospital Admin Dashboard</div></div></div><div class="stack-item"><div class="stack-item-icon">📞</div><div><div class="stack-item-name">Amazon Lex & Polly</div><div class="stack-item-role">Offline Voice IVR System</div></div></div></div>
+          <div class="stack-col"><div class="stack-col-title">Backend Core</div><div class="stack-item"><div class="stack-item-icon">🐍</div><div><div class="stack-item-name">FastAPI & Celery</div><div class="stack-item-role">Microservices architecture</div></div></div><div class="stack-item"><div class="stack-item-icon">🐋</div><div><div class="stack-item-name">Docker Compose</div><div class="stack-item-role">Local isolated cluster</div></div></div></div>
+          <div class="stack-col"><div class="stack-col-title">AI & Federated Learning</div><div class="stack-item"><div class="stack-item-icon">🛡️</div><div><div class="stack-item-name">Flower (flwr)</div><div class="stack-item-role">Federated model aggregation</div></div></div><div class="stack-item"><div class="stack-item-icon">🧠</div><div><div class="stack-item-name">PyTorch & XGBoost</div><div class="stack-item-role">LSTM forecasting & churn</div></div></div></div>
+          <div class="stack-col"><div class="stack-col-title">Cloud Infrastructure</div><div class="stack-item"><div class="stack-item-icon">☁️</div><div><div class="stack-item-name">AWS Bedrock</div><div class="stack-item-role">Nova Lite Story Engine</div></div></div><div class="stack-item"><div class="stack-item-icon">🐘</div><div><div class="stack-item-name">PostgreSQL & Redis</div><div class="stack-item-role">Data & message brokering</div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S12: ROADMAP ── -->
+    <div class="slide" id="s12">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="inner">
+        <div class="section-label">Roadmap</div>
+        <h2>From hackathon<br><span>to national lifeline.</span></h2>
+        <p class="lead">A phased rollout designed to validate fast, scale responsibly, and reach every patient who needs us.</p>
+        <div class="roadmap-row">
+          <div class="roadmap-phase"><div class="phase-label">Phase 1 · Now</div><div class="phase-title">Hackathon MVP</div><div class="phase-items"><div class="phase-item done">✓ 12-antigen matching engine</div><div class="phase-item done">✓ AI churn predictor</div><div class="phase-item done">✓ Privacy architecture</div><div class="phase-item done">✓ Working prototype</div></div></div>
+          <div class="roadmap-phase"><div class="phase-label">Phase 2 · 3 months</div><div class="phase-title">Pilot — 1 City</div><div class="phase-items"><div class="phase-item">Partner with 2 thalassemia centres</div><div class="phase-item">Onboard 500 real patients</div><div class="phase-item">Recruit 2,500 guardian donors</div><div class="phase-item">Validate AI match accuracy</div></div></div>
+          <div class="roadmap-phase"><div class="phase-label">Phase 3 · 12 months</div><div class="phase-title">State Rollout</div><div class="phase-items"><div class="phase-item">5 cities, 20 hospitals</div><div class="phase-item">10,000 patients onboarded</div><div class="phase-item">Blood bank API integrations</div><div class="phase-item">Government health portal tie-in</div></div></div>
+          <div class="roadmap-phase"><div class="phase-label">Phase 4 · 24 months</div><div class="phase-title">National Scale</div><div class="phase-items"><div class="phase-item">All India coverage</div><div class="phase-item">1.5L patients served</div><div class="phase-item">SCD & rare blood groups</div><div class="phase-item">Regional language support</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S13: TEAM ── -->
+    <div class="slide" id="s13">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="section-label">The Team</div>
+        <h2>Built by people who<br><span>give a damn.</span></h2>
+        <p class="lead">A multidisciplinary team combining clinical knowledge, AI expertise, and product design.</p>
+        <div class="team-grid">
+          <div class="team-card"><div class="team-avatar">👨‍💻</div><div class="team-name">Team Member 1</div><div class="team-role">AI / ML Lead</div><div class="team-bio">Matching algorithms, churn prediction, and risk sentinel models</div></div>
+          <div class="team-card"><div class="team-avatar">👩‍⚕️</div><div class="team-name">Team Member 1</div><div class="team-role">Clinical Advisor</div><div class="team-bio">Transfusion medicine expertise, antigen system design, protocol validation</div></div>
+          <div class="team-card"><div class="team-avatar">👨‍🎨</div><div class="team-name">Team Member 2</div><div class="team-role">Product & Design</div><div class="team-bio">User experience, privacy UX, patient and donor journey design</div></div>
+          <div class="team-card"><div class="team-avatar">👩‍💼</div><div class="team-name">Team Member 2</div><div class="team-role">Strategy & GTM</div><div class="team-bio">Hospital partnerships, NGO relations, government health policy</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── S14: CLOSE ── -->
+    <div class="slide" id="s14">
+      <div class="bg-grid"></div>
+      <div class="bg-glow-left"></div>
+      <div class="bg-glow-right"></div>
+      <div class="inner">
+        <div class="eyebrow">Join the Mission</div>
+        <h2>Every child deserves<br><span>a guardian.</span></h2>
+        <p class="tagline">RakSetu is looking for hospital partners, NGO collaborators, and early believers who want to make lifelong blood access a reality in India.</p>
+        <div class="cta-row">
+          <button class="cta-btn">🤝 Partner With Us</button>
+          <button class="cta-secondary">📋 View Full Demo</button>
+        </div>
+        <div class="contact-row">
+          <div class="contact-item">Email: <span>team@raksetu.in</span></div>
+          <div class="contact-item">Built at: <span>Hackathon 2026</span></div>
+          <div class="contact-item">For: <span>Blood Warriors 🩸</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /deck -->
+
+  <!-- ═══ NAV BAR — BELOW THE DECK ═══ -->
+  <div class="nav-bar">
+    <span class="nav-logo">RakSetu</span>
+    <div class="nav-center">
+      <button class="nav-btn" id="prevBtn">&#8249;</button>
+      <div class="nav-dots" id="navDots"></div>
+      <button class="nav-btn" id="nextBtn">&#8250;</button>
+      <span class="nav-progress" id="navProgress">01 / 14</span>
+    </div>
+    <span class="nav-hint">← → or click to navigate</span>
+  </div>
+
+</div><!-- /deck-wrapper -->
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const dotsEl  = document.getElementById('navDots');
+  const progEl  = document.getElementById('navProgress');
+  const total   = slides.length;
+  let cur = 0;
+
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dotsEl.appendChild(d);
+  });
+
+  function goTo(n) {
+    slides[cur].classList.remove('active');
+    dotsEl.children[cur].classList.remove('active');
+    cur = (n + total) % total;
+    slides[cur].classList.add('active');
+    dotsEl.children[cur].classList.add('active');
+    progEl.textContent = String(cur + 1).padStart(2,'0') + ' / ' + String(total).padStart(2,'0');
+  }
+
+  document.getElementById('prevBtn').addEventListener('click', () => goTo(cur - 1));
+  document.getElementById('nextBtn').addEventListener('click', () => goTo(cur + 1));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(cur + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goTo(cur - 1);
+  });
+</script>
+</body>
+</html>

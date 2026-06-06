@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore, useDashboardStore } from "./store";
 
@@ -13,11 +14,11 @@ declare global {
 }
 
 // Pages
-import Dashboard    from "./pages/Dashboard";
-import PatientView  from "./pages/PatientView";
-import DonorPortal  from "./pages/DonorPortal";
-import Onboarding   from "./pages/Onboarding";
-import Login        from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import PatientView from "./pages/PatientView";
+import DonorPortal from "./pages/DonorPortal";
+import Onboarding from "./pages/Onboarding";
+import Login from "./pages/Login";
 
 
 // refresh token on app start will be handled inside App component
@@ -57,13 +58,13 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
           }
 
           addEvent({
-            id:        crypto.randomUUID(),
-            event:     data.event || "unknown",
-            data:      data.data || {},
-            urgency:   data.urgency || "normal",
+            id: crypto.randomUUID(),
+            event: data.event || "unknown",
+            data: data.data || {},
+            urgency: data.urgency || "normal",
             timestamp: new Date().toISOString(),
           });
-        } catch (_) {}
+        } catch (_) { }
       };
 
       ws.onclose = () => {
@@ -92,7 +93,7 @@ export default function App() {
     <BrowserRouter>
       <WebSocketProvider>
         <Routes>
-          <Route path="/login"     element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/" element={
             <ProtectedRoute><Dashboard /></ProtectedRoute>
@@ -107,5 +108,14 @@ export default function App() {
         </Routes>
       </WebSocketProvider>
     </BrowserRouter>
+  );
+}
+
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
   );
 }
