@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, User, Phone, Calendar, TrendingDown, Zap } from "lucide-react";
+import { AlertTriangle, User, Phone, Calendar, TrendingDown, Zap, ArrowLeft } from "lucide-react";
 import { demoAPI, donorAPI } from "../api/client";
 import { useNavigate } from "react-router-dom";
-
+import ParticleBackground from "../components/ParticleBackground";
+import "../index.css";
 
 interface AtRiskDonor {
   donor_id:            string;
@@ -14,8 +15,8 @@ interface AtRiskDonor {
   churn_probability:   number;
   days_since_donation: number;
   donations_total:     number;
-  patient_name:        string;  // the patient they're matched to
-  inactive_reason:     string;  // from inactive_trigger_comment
+  patient_name:        string;
+  inactive_reason:     string;
   cascade_status:      "idle" | "running" | "done";
 }
 
@@ -30,9 +31,9 @@ const DEMO_DONORS: AtRiskDonor[] = [
 ];
 
 function churnColor(prob: number) {
-  if (prob >= 0.8) return { color: "#E8554E", bg: "rgba(232,85,78,0.08)",  border: "rgba(232,85,78,0.4)"  };
-  if (prob >= 0.6) return { color: "#E8952A", bg: "rgba(232,149,42,0.08)", border: "rgba(232,149,42,0.4)" };
-  return               { color: "#6366F1", bg: "rgba(99,102,241,0.08)",  border: "rgba(99,102,241,0.4)"  };
+  if (prob >= 0.8) return { color: "#E8554E", bg: "rgba(232,85,78,0.08)",  border: "rgba(232,85,78,0.4)",  glow: "rgba(232,85,78,0.2)" };
+  if (prob >= 0.6) return { color: "#E8952A", bg: "rgba(232,149,42,0.08)", border: "rgba(232,149,42,0.4)", glow: "rgba(232,149,42,0.2)" };
+  return               { color: "#6366F1", bg: "rgba(99,102,241,0.08)",  border: "rgba(99,102,241,0.4)", glow: "rgba(99,102,241,0.15)" };
 }
 
 export default function AtRiskDonors() {
@@ -67,62 +68,70 @@ export default function AtRiskDonors() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#08080A", color: "#F0EEE8", fontFamily: "'Syne', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#08080A", color: "#F0EEE8", fontFamily: "'DM Sans', sans-serif" }}>
+      <ParticleBackground />
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(10,10,11,0.8)", backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100 }}>
+      <header className="app-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", cursor: "pointer" }} onClick={() => navigate("/")}>
-            <span style={{ color: "#E8554E" }}>Rak</span>Setu
-          </span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#444", background: "#18181C", border: "1px solid rgba(255,255,255,0.06)", padding: "3px 8px", borderRadius: 4 }}>
-            at-risk-donors
+          <motion.button whileHover={{ x: -2 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")}
+            style={{ background: "none", border: "none", color: "#888", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
+            <ArrowLeft size={16} /> Dashboard
+          </motion.button>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700 }}>
+            At-Risk Donors
           </span>
         </div>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.08)", color: "#888", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-          ← Dashboard
-        </button>
       </header>
 
-      <main style={{ padding: "32px" }}>
+      <main style={{ padding: "32px", maxWidth: 1000, margin: "0 auto", position: "relative", zIndex: 1 }}>
 
         {/* Hero stat */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          style={{ background: "rgba(232,149,42,0.06)", border: "1px solid rgba(232,149,42,0.3)", borderRadius: 14, padding: "28px 32px", marginBottom: 32, display: "flex", alignItems: "center", gap: 24 }}>
-          <div style={{ background: "rgba(232,149,42,0.12)", borderRadius: 12, padding: 16 }}>
-            <TrendingDown size={32} color="#E8952A" />
+          style={{
+            background: "linear-gradient(135deg, rgba(232,149,42,0.1) 0%, rgba(14,14,20,0.8) 100%)",
+            border: "1px solid rgba(232,149,42,0.3)", borderRadius: 20, padding: "36px 40px",
+            marginBottom: 32, display: "flex", alignItems: "center", gap: 32,
+            backdropFilter: "blur(16px)", boxShadow: "0 16px 48px rgba(232,149,42,0.1)"
+          }}>
+          <div style={{ background: "rgba(232,149,42,0.15)", borderRadius: 16, padding: 20, border: "1px solid rgba(232,149,42,0.3)", boxShadow: "0 0 24px rgba(232,149,42,0.2)" }}>
+            <TrendingDown size={40} color="#E8952A" />
           </div>
-          <div>
-            <div style={{ fontSize: 48, fontWeight: 800, color: "#E8952A", lineHeight: 1 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 56, fontWeight: 800, color: "#E8952A", lineHeight: 1, letterSpacing: "-0.02em" }}>
               {loading ? "—" : donors.length}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#888", marginTop: 4 }}>
+            <div style={{ fontSize: 15, color: "#F0EEE8", marginTop: 8, fontWeight: 500 }}>
               matched bridge donors at risk of dropping out
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#555", marginTop: 4 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#888", marginTop: 6 }}>
               18.6% of all bridge donors · each has an assigned patient depending on them
             </div>
           </div>
-          <div style={{ marginLeft: "auto" }}>
+          <div>
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={triggerAll}
-              style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: "#C0272D", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif", display: "flex", alignItems: "center", gap: 8 }}>
+              className="btn-crimson"
+              style={{ padding: "14px 28px", fontSize: 15 }}>
               <Zap size={16} />
               Activate Top 3 Now
             </motion.button>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#555", textAlign: "center", marginTop: 6 }}>
-              triggers WhatsApp → SMS → Voice cascade
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#888", textAlign: "center", marginTop: 10, letterSpacing: "0.05em" }}>
+              triggers WhatsApp → SMS → Voice
             </div>
           </div>
         </motion.div>
 
+        <div className="section-label">RISK POOL</div>
+
         {/* Donor cards */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <AnimatePresence>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} style={{ height: 96, background: "#111113", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }} />
+                  <div key={i} className="skeleton" style={{ height: 110, border: "1px solid rgba(255,255,255,0.04)" }} />
                 ))
               : donors.map((d, i) => {
                   const c = churnColor(d.churn_probability);
@@ -130,38 +139,43 @@ export default function AtRiskDonors() {
                   const isDone    = d.cascade_status === "done";
                   return (
                     <motion.div key={d.donor_id}
-                      initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-                      style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20 }}>
+                      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -2, boxShadow: `0 8px 32px ${c.glow}` }}
+                      style={{
+                        background: c.bg, border: `1px solid ${c.border}`, borderRadius: 14, padding: "20px 24px",
+                        display: "flex", alignItems: "center", gap: 24, backdropFilter: "blur(12px)",
+                        transition: "all 0.3s ease",
+                      }}>
 
                       {/* Churn score */}
-                      <div style={{ minWidth: 64, textAlign: "center" }}>
-                        <div style={{ fontSize: 24, fontWeight: 800, color: c.color, lineHeight: 1 }}>
+                      <div style={{ minWidth: 72, textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 32, fontWeight: 800, color: c.color, lineHeight: 1 }}>
                           {Math.round(d.churn_probability * 100)}%
                         </div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#555" }}>CHURN</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.1em" }}>CHURN</div>
                         {/* Churn bar */}
-                        <div style={{ marginTop: 4, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${d.churn_probability * 100}%`, background: c.color, borderRadius: 2 }} />
+                        <div className="progress-track" style={{ marginTop: 8, height: 4 }}>
+                          <div style={{ height: "100%", width: `${d.churn_probability * 100}%`, background: c.color, borderRadius: 2, boxShadow: `0 0 8px ${c.color}` }} />
                         </div>
                       </div>
 
-                      <div style={{ width: 1, height: 48, background: "rgba(255,255,255,0.06)" }} />
+                      <div style={{ width: 1, height: 56, background: "rgba(255,255,255,0.08)" }} />
 
                       {/* Donor info */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-                          <span style={{ fontSize: 15, fontWeight: 700 }}>{d.name}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.color, background: `${c.border}33`, border: `1px solid ${c.border}`, padding: "2px 8px", borderRadius: 3 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: "#F0EEE8" }}>{d.name}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.color, background: `${c.border}33`, border: `1px solid ${c.border}`, padding: "2px 10px", borderRadius: 4, fontWeight: 600 }}>
                             {d.blood_group}
                           </span>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#555" }}>{d.city}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#888" }}>{d.city}</span>
                         </div>
-                        <div style={{ display: "flex", gap: 16, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#555", marginBottom: 5 }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Phone size={10} /> {d.phone}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={10} /> {d.days_since_donation}d since last donation</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={10} /> matched to {d.patient_name}</span>
+                        <div style={{ display: "flex", gap: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#888", marginBottom: 10 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Phone size={12} color={c.color} /> {d.phone}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Calendar size={12} color={c.color} /> {d.days_since_donation}d since last donation</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={12} color={c.color} /> matched to {d.patient_name}</span>
                         </div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#E8952A", background: "rgba(232,149,42,0.08)", border: "1px solid rgba(232,149,42,0.2)", borderRadius: 4, padding: "3px 8px", display: "inline-block" }}>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#E8952A", background: "rgba(232,149,42,0.12)", border: "1px solid rgba(232,149,42,0.3)", borderRadius: 6, padding: "4px 10px", display: "inline-block" }}>
                           ⚠ {d.inactive_reason}
                         </div>
                       </div>
@@ -171,7 +185,13 @@ export default function AtRiskDonors() {
                         whileTap={{ scale: 0.96 }}
                         onClick={() => triggerCascade(d.donor_id)}
                         disabled={isRunning || isDone}
-                        style={{ padding: "10px 20px", borderRadius: 7, border: "none", background: isDone ? "#1DB88E" : isRunning ? "#333" : "#C0272D", color: "#fff", fontSize: 13, fontWeight: 700, cursor: isRunning || isDone ? "not-allowed" : "pointer", fontFamily: "'Syne', sans-serif", minWidth: 150, transition: "background 0.2s" }}>
+                        className={isDone || isRunning ? "" : "btn-crimson"}
+                        style={{
+                          padding: "12px 24px", borderRadius: 10, fontSize: 14, minWidth: 170,
+                          background: isDone ? "#1DB88E" : isRunning ? "#333" : undefined,
+                          border: isDone || isRunning ? "none" : undefined, color: "#fff",
+                          cursor: isRunning || isDone ? "not-allowed" : "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700
+                        }}>
                         {isDone ? "✓ Cascade Sent" : isRunning ? "Triggering..." : "Start Cascade →"}
                       </motion.button>
                     </motion.div>

@@ -39,13 +39,13 @@ class AntigenProfile(Base):
     abo         = Column(String(3), nullable=False)
     rh_d        = Column(Boolean, nullable=False)
     # Rh system
-    rh_c        = Column(Boolean)
-    rh_C        = Column(Boolean)
-    rh_e        = Column(Boolean)
-    rh_E        = Column(Boolean)
+    rh_c        = Column("rh_c_lower", Boolean)
+    rh_C        = Column("rh_C_upper", Boolean)
+    rh_e        = Column("rh_e_lower", Boolean)
+    rh_E        = Column("rh_E_upper", Boolean)
     # Kell
-    kell_k      = Column(Boolean)
-    kell_K      = Column(Boolean)
+    kell_k      = Column("kell_k_lower", Boolean)
+    kell_K      = Column("kell_K_upper", Boolean)
     # Duffy
     duffy_fya   = Column(Boolean)
     duffy_fyb   = Column(Boolean)
@@ -53,16 +53,15 @@ class AntigenProfile(Base):
     kidd_jka    = Column(Boolean)
     kidd_jkb    = Column(Boolean)
     # MNS
-    mns_M       = Column(Boolean)
-    mns_N       = Column(Boolean)
-    mns_S       = Column(Boolean)
-    mns_s       = Column(Boolean)
+    mns_M       = Column("mns_M_upper", Boolean)
+    mns_N       = Column("mns_N_upper", Boolean)
+    mns_S       = Column("mns_S_upper", Boolean)
+    mns_s       = Column("mns_s_lower", Boolean)
     source      = Column(String(30), default="serological")
     genotyped_at = Column(DateTime)
     created_at  = Column(DateTime, default=datetime.utcnow)
 
     person = relationship("Person", foreign_keys=[person_id])
-
 
 class Patient(Base):
     __tablename__ = "patients"

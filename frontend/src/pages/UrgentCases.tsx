@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock, Droplets, MapPin, Phone } from "lucide-react";
+import { AlertTriangle, Clock, Droplets, MapPin, Phone, ArrowLeft } from "lucide-react";
 import { demoAPI, matchingAPI } from "../api/client";
 import { useNavigate } from "react-router-dom";
+import ParticleBackground from "../components/ParticleBackground";
+import "../index.css";
 
 interface UrgentPatient {
   patient_id:               string;
@@ -27,9 +29,9 @@ const DEMO_PATIENTS: UrgentPatient[] = [
 ];
 
 function urgencyColor(days: number) {
-  if (days <= 2) return { border: "rgba(232,85,78,0.5)",  bg: "rgba(232,85,78,0.07)",  label: "#E8554E", tag: "CRITICAL" };
-  if (days <= 4) return { border: "rgba(232,149,42,0.5)", bg: "rgba(232,149,42,0.07)", label: "#E8952A", tag: "URGENT"   };
-  return               { border: "rgba(99,102,241,0.4)",  bg: "rgba(99,102,241,0.06)", label: "#6366F1", tag: "THIS WEEK"};
+  if (days <= 2) return { border: "rgba(232,85,78,0.5)",  bg: "rgba(232,85,78,0.08)",  label: "#E8554E", tag: "CRITICAL", glow: "rgba(232,85,78,0.2)" };
+  if (days <= 4) return { border: "rgba(232,149,42,0.5)", bg: "rgba(232,149,42,0.08)", label: "#E8952A", tag: "URGENT",   glow: "rgba(232,149,42,0.2)" };
+  return               { border: "rgba(99,102,241,0.4)",  bg: "rgba(99,102,241,0.06)", label: "#6366F1", tag: "THIS WEEK", glow: "rgba(99,102,241,0.15)" };
 }
 
 export default function UrgentCases() {
@@ -61,90 +63,102 @@ export default function UrgentCases() {
   const thisWeek = patients.filter(p => p.days_until_transfusion > 4);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#08080A", color: "#F0EEE8", fontFamily: "'Syne', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#08080A", color: "#F0EEE8", fontFamily: "'DM Sans', sans-serif" }}>
+      <ParticleBackground />
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(10,10,11,0.8)", backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100 }}>
+      <header className="app-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", cursor: "pointer" }} onClick={() => navigate("/")}>
-            <span style={{ color: "#E8554E" }}>Rak</span>Setu
-          </span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#444", background: "#18181C", border: "1px solid rgba(255,255,255,0.06)", padding: "3px 8px", borderRadius: 4 }}>
-            urgent-cases
+          <motion.button whileHover={{ x: -2 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")}
+            style={{ background: "none", border: "none", color: "#888", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
+            <ArrowLeft size={16} /> Dashboard
+          </motion.button>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700 }}>
+            Urgent Cases
           </span>
         </div>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.08)", color: "#888", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-          ← Dashboard
-        </button>
       </header>
 
-      <main style={{ padding: "32px" }}>
+      <main style={{ padding: "32px", maxWidth: 1000, margin: "0 auto", position: "relative", zIndex: 1 }}>
 
         {/* Hero stat */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          style={{ background: "rgba(232,85,78,0.06)", border: "1px solid rgba(232,85,78,0.3)", borderRadius: 14, padding: "28px 32px", marginBottom: 32, display: "flex", alignItems: "center", gap: 24 }}>
-          <div style={{ background: "rgba(232,85,78,0.12)", borderRadius: 12, padding: 16 }}>
-            <AlertTriangle size={32} color="#E8554E" />
+          style={{
+            background: "linear-gradient(135deg, rgba(232,85,78,0.1) 0%, rgba(14,14,20,0.8) 100%)",
+            border: "1px solid rgba(232,85,78,0.3)", borderRadius: 20, padding: "36px 40px",
+            marginBottom: 32, display: "flex", alignItems: "center", gap: 32,
+            backdropFilter: "blur(16px)", boxShadow: "0 16px 48px rgba(232,85,78,0.15)"
+          }}>
+          <div style={{ background: "rgba(232,85,78,0.15)", borderRadius: 16, padding: 20, border: "1px solid rgba(232,85,78,0.3)", boxShadow: "0 0 24px rgba(232,85,78,0.2)" }}>
+            <AlertTriangle size={40} color="#E8554E" />
           </div>
           <div>
-            <div style={{ fontSize: 48, fontWeight: 800, color: "#E8554E", lineHeight: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 56, fontWeight: 800, color: "#E8554E", lineHeight: 1, letterSpacing: "-0.02em" }}>
               {loading ? "—" : patients.length}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#888", marginTop: 4 }}>
+            <div style={{ fontSize: 15, color: "#F0EEE8", marginTop: 8, fontWeight: 500 }}>
               patients need transfusion in the next 7 days
             </div>
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 24 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 32 }}>
             {[
               { label: "CRITICAL (≤2d)", value: critical.length, color: "#E8554E" },
               { label: "URGENT (≤4d)",   value: urgent.length,   color: "#E8952A" },
               { label: "THIS WEEK",       value: thisWeek.length, color: "#6366F1" },
-            ].map(s => (
-              <div key={s.label} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#555", letterSpacing: "0.08em" }}>{s.label}</div>
-              </div>
+            ].map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.1 }} style={{ textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 32, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#888", letterSpacing: "0.1em", marginTop: 4 }}>{s.label}</div>
+              </motion.div>
             ))}
           </div>
         </motion.div>
 
+        <div className="section-label">ACTIONABLE CASES</div>
+
         {/* Patient cards */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <AnimatePresence>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} style={{ height: 88, background: "#111113", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)", animation: "pulse 1.5s infinite" }} />
+                  <div key={i} className="skeleton" style={{ height: 100, border: "1px solid rgba(255,255,255,0.04)" }} />
                 ))
               : patients.map((p, i) => {
                   const u = urgencyColor(p.days_until_transfusion);
                   const isTriggering = triggering === p.patient_id;
                   return (
                     <motion.div key={p.patient_id}
-                      initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-                      style={{ background: u.bg, border: `1px solid ${u.border}`, borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20 }}>
+                      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -2, boxShadow: `0 8px 32px ${u.glow}` }}
+                      style={{
+                        background: u.bg, border: `1px solid ${u.border}`, borderRadius: 14, padding: "20px 24px",
+                        display: "flex", alignItems: "center", gap: 24, backdropFilter: "blur(12px)",
+                        transition: "all 0.3s ease",
+                      }}>
 
                       {/* Days badge */}
-                      <div style={{ minWidth: 56, textAlign: "center" }}>
-                        <div style={{ fontSize: 26, fontWeight: 800, color: u.label, lineHeight: 1 }}>{p.days_until_transfusion}</div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#555" }}>DAYS</div>
+                      <div style={{ minWidth: 64, textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 32, fontWeight: 800, color: u.label, lineHeight: 1 }}>{p.days_until_transfusion}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.1em" }}>DAYS</div>
                       </div>
 
-                      <div style={{ width: 1, height: 40, background: "rgba(255,255,255,0.06)" }} />
+                      <div style={{ width: 1, height: 48, background: "rgba(255,255,255,0.08)" }} />
 
                       {/* Patient info */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                          <span style={{ fontSize: 15, fontWeight: 700 }}>{p.name}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: u.label, background: `${u.border}33`, border: `1px solid ${u.border}`, padding: "2px 8px", borderRadius: 3 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: "#F0EEE8" }}>{p.name}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: u.label, background: `${u.border}33`, border: `1px solid ${u.border}`, padding: "2px 10px", borderRadius: 4, fontWeight: 600 }}>
                             {p.blood_group}
                           </span>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: u.label, letterSpacing: "0.1em" }}>{u.tag}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: u.label, letterSpacing: "0.1em", fontWeight: 600 }}>{u.tag}</span>
                         </div>
-                        <div style={{ display: "flex", gap: 16, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#555" }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={10} /> {p.city}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Phone size={10} /> {p.phone}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={10} /> {p.expected_next_transfusion_date}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Droplets size={10} /> {p.active_donors}/{p.guardian_circle_size} donors active</span>
+                        <div style={{ display: "flex", gap: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#888" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><MapPin size={12} color={u.label} /> {p.city}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Phone size={12} color={u.label} /> {p.phone}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={12} color={u.label} /> {p.expected_next_transfusion_date}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Droplets size={12} color={u.label} /> {p.active_donors}/{p.guardian_circle_size} donors</span>
                         </div>
                       </div>
 
@@ -153,8 +167,13 @@ export default function UrgentCases() {
                         whileTap={{ scale: 0.96 }}
                         onClick={() => triggerRequest(p.patient_id)}
                         disabled={isTriggering}
-                        style={{ padding: "10px 20px", borderRadius: 7, border: "none", background: isTriggering ? "#1DB88E" : "#C0272D", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif", minWidth: 140, transition: "background 0.2s" }}>
-                        {isTriggering ? "✓ Triggered" : "Trigger Cascade →"}
+                        className={isTriggering ? "" : "btn-crimson"}
+                        style={{
+                          padding: "12px 24px", borderRadius: 10, fontSize: 14, minWidth: 160,
+                          background: isTriggering ? "#1DB88E" : undefined, border: "none", color: "#fff",
+                          cursor: isTriggering ? "default" : "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700
+                        }}>
+                        {isTriggering ? "✓ Cascade Triggered" : "Trigger Cascade →"}
                       </motion.button>
                     </motion.div>
                   );

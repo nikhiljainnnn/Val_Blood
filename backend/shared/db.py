@@ -13,15 +13,16 @@ from shared.models import Base
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:raksetu_dev@localhost/raksetu"
+    "sqlite+aiosqlite:///./raksetu.db"
 )
 
+# SQLite doesn't support pool_size/max_overflow
+_is_sqlite = DATABASE_URL.startswith("sqlite")
 engine = create_async_engine(
     DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
+    pool_pre_ping=not _is_sqlite,
     echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+    **({} if _is_sqlite else {"pool_size": 10, "max_overflow": 20}),
 )
 
 AsyncSessionLocal = async_sessionmaker(
