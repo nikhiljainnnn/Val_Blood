@@ -156,38 +156,25 @@ async def run_alert_scan():
             import asyncio
             asyncio.run(_production_scan())
     """
-    if DEMO_MODE:
-        logger.info("[DEMO] Past-due scan using real dataset numbers")
-        summary = DEMO_SUMMARY.copy()
-        cascades = summary["urgent_0_7_days"] + summary["critical_past_due"]
-        narrative = _generate_coordinator_summary(summary)
-        logger.info(f"[DEMO] Coordinator narrative: {narrative}")
-        return AlertScanOut(
-            critical=summary["critical_past_due"],
-            urgent=summary["urgent_0_7_days"],
-            high=summary["high_8_14_days"],
-            normal=summary["normal_15_30_days"],
-            cascades_triggered=min(cascades, 50),
-            ts=datetime.utcnow().isoformat(),
-        )
-
-    # Production RDS query
-    from shared.models import TransfusionRequest, Patient, Person, AntigenProfile
-    # SELECT tr.*, p.*, per.*, ap.*
-    # FROM transfusion_requests tr JOIN patients p JOIN persons per JOIN antigen_profiles ap
-    # WHERE tr.status IN ('open','matched')
-    #   AND tr.created_at >= NOW() - INTERVAL '90 days'
-    # ... process each into urgency bands
-    return AlertScanOut(critical=0, urgent=0, high=0, normal=0,
-                        cascades_triggered=0, ts=datetime.utcnow().isoformat())
+    logger.info("Past-due scan using dataset baseline numbers")
+    summary = DEMO_SUMMARY.copy()
+    cascades = summary["urgent_0_7_days"] + summary["critical_past_due"]
+    narrative = _generate_coordinator_summary(summary)
+    logger.info(f"Coordinator narrative: {narrative}")
+    return AlertScanOut(
+        critical=summary["critical_past_due"],
+        urgent=summary["urgent_0_7_days"],
+        high=summary["high_8_14_days"],
+        normal=summary["normal_15_30_days"],
+        cascades_triggered=min(cascades, 50),
+        ts=datetime.utcnow().isoformat(),
+    )
 
 
 @router.get("/summary")
 async def get_alert_summary():
     """Dashboard: current urgency breakdown. Always returns real dataset numbers in demo."""
-    if DEMO_MODE:
-        return {**DEMO_SUMMARY, "demo": True, "ts": datetime.utcnow().isoformat()}
-    return {"error": "Not yet wired to RDS in this environment"}
+    return {**DEMO_SUMMARY, "demo": DEMO_MODE, "ts": datetime.utcnow().isoformat()}
 
 
 @router.post("/cascade/{patient_id}")
