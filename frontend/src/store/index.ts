@@ -26,14 +26,23 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, role, userId, name) =>
         set({ token, role, userId, name }),
 
-      // Call this on app load to silently refresh Cognito session
+      // Call this on app load to silently refresh Cognito session.
+      // If Cognito is not configured (demo mode), this is a no-op —
+      // it does NOT clear an existing token from localStorage.
       refreshToken: async () => {
+        const cognitoConfigured =
+          import.meta.env.VITE_COGNITO_USER_POOL_ID &&
+          import.meta.env.VITE_COGNITO_CLIENT_ID;
+
+        if (!cognitoConfigured) return; // demo mode — skip
+
         try {
           const session = await fetchAuthSession();
           const token = session.tokens?.idToken?.toString() ?? null;
           if (token) set({ token });
         } catch {
-          set({ token: null, role: null, userId: null, name: null });
+          // Session refresh failed — keep existing token, don't wipe it.
+          // The user will be redirected on next actual API 401 (if REQUIRE_AUTH is set).
         }
       },
 
