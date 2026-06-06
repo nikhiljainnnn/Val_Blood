@@ -23,6 +23,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, exists, func
 
+from shared.db import get_db
+
 logger = logging.getLogger("guest-activator")
 
 DEMO_MODE   = os.getenv("DEMO_MODE",   "true").lower() == "true"
@@ -138,9 +140,7 @@ async def _send_whatsapp(phone: str, message: str, name: str) -> bool:
 
 
 @router.post("/activate-guests", response_model=GuestActivationOut)
-async def activate_guests(body: ActivateGuestsIn, db: AsyncSession = Depends(
-    lambda: None  # injected by api-gateway; replace with get_db in final wiring
-)):
+async def activate_guests(body: ActivateGuestsIn, db: AsyncSession = Depends(get_db)):
     """
     Scan guest users with blood group info and send activation messages.
     Priority: rare blood groups first, then normal.
@@ -192,7 +192,7 @@ async def activate_guests(body: ActivateGuestsIn, db: AsyncSession = Depends(
 
 
 @router.get("/guest-pool/stats")
-async def guest_pool_stats(db: AsyncSession = Depends(lambda: None)):
+async def guest_pool_stats(db: AsyncSession = Depends(get_db)):
     """Dashboard stats for guest pool calculated live from database."""
     from shared.models import Person, AntigenProfile
     

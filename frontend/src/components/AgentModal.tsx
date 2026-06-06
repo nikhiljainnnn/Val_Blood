@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Loader, CheckCircle } from "lucide-react";
+import { X, Play, Loader, CheckCircle, BrainCircuit } from "lucide-react";
 import { upgradesAPI } from "../api/client";
+import { useDashboardStore } from "../store";
 
 export default function AgentModal({
   isOpen,
@@ -24,6 +25,16 @@ export default function AgentModal({
     try {
       const res = await upgradesAPI.runAgent(task);
       setResult(res.data);
+      
+      // Inject action into the Dashboard's Live Feed
+      useDashboardStore.getState().addEvent({
+        id: `agent-${Date.now()}`,
+        event: "Agent Workflow Complete",
+        urgency: "urgent",
+        timestamp: Date.now(),
+        data: { task }
+      });
+      
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || "Failed to run agent");
     } finally {
@@ -136,21 +147,60 @@ export default function AgentModal({
                   style={{ marginTop: 24 }}
                 >
                   <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "var(--text-main)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <CheckCircle size={16} style={{ color: "var(--success)" }} /> Execution Result
+                    <CheckCircle size={16} style={{ color: "var(--success)" }} /> Execution Complete
                   </h3>
-                  <div style={{
-                    background: "var(--navy-1)",
-                    border: "1px solid var(--border-light)",
-                    borderRadius: 12,
-                    padding: 16,
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    whiteSpace: "pre-wrap",
-                    overflowX: "auto"
-                  }}>
-                    {JSON.stringify(result, null, 2)}
-                  </div>
+                  
+                  {/* Clean up and format the response text */}
+                  {(() => {
+                    let responseText = result.response || "";
+                    let thinkingText = "";
+                    
+                    const thinkMatch = responseText.match(/<thinking>([\s\S]*?)<\/thinking>/);
+                    if (thinkMatch) {
+                      thinkingText = thinkMatch[1].trim();
+                      responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/, "").trim();
+                    }
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {thinkingText && (
+                          <div style={{
+                            background: "rgba(255,255,255,0.03)",
+                            border: "1px solid var(--border-light)",
+                            borderRadius: 12,
+                            padding: "12px 16px",
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase" }}>
+                              <BrainCircuit size={12} /> Agent Thinking Process
+                            </div>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", whiteSpace: "pre-wrap", fontStyle: "italic" }}>
+                              {thinkingText}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {responseText && (
+                          <div style={{
+                            background: "var(--navy-1)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 12,
+                            padding: "16px",
+                            fontFamily: "var(--font-main)",
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            color: "var(--text-main)",
+                            whiteSpace: "pre-wrap",
+                          }}>
+                            {responseText}
+                          </div>
+                        )}
+                        
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", textAlign: "right" }}>
+                          Completed in {result.iterations} iterations
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               )}
             </div>
