@@ -162,7 +162,6 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-<<<<<<< HEAD
     import("../api/client").then(({ matchingAPI, demoAPI, patientAPI }) => {
       // Fetch latest patient
       patientAPI.getPatients().then(res => {
@@ -175,12 +174,6 @@ export default function Dashboard() {
             .catch(console.error);
         }
       }).catch(console.error);
-=======
-    import("../api/client").then(({ matchingAPI, demoAPI }) => {
-      matchingAPI.getGuardianCircle("demo-patient-001")
-        .then((res: any) => setCircle(res.data?.donors || []))
-        .catch(console.error);
->>>>>>> 480ba97 (added changes in frontend)
 
       demoAPI.getDemoSummary()
         .then((r: any) => {
@@ -316,15 +309,10 @@ export default function Dashboard() {
             style={{ padding: "9px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", gap: 6 }}>
             <Activity size={14} /> Run Agent
           </motion.button>
-<<<<<<< HEAD
-          <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate(`/patient/${latestPatientId}`)}
-            className="btn-primary" style={{ padding:"9px 18px" }}>
-=======
 
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate("/patient/demo-patient-001")}
             className="btn-primary"
             style={{ padding: "9px 18px", display: "flex", alignItems: "center", gap: 6 }}>
->>>>>>> 480ba97 (added changes in frontend)
             <Droplets size={14} /> View Patient
           </motion.button>
         </div>
