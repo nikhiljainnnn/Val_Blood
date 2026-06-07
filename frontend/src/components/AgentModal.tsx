@@ -23,7 +23,8 @@ export default function AgentModal({
     setResult(null);
     setError(null);
     try {
-      const res = await upgradesAPI.runAgent(task);
+      // Fix: Pass as an object { task }
+      const res = await upgradesAPI.runAgent({ task });
       setResult(res.data);
       
       // Inject action into the Dashboard's Live Feed
@@ -36,7 +37,17 @@ export default function AgentModal({
       });
       
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Failed to run agent");
+      let errorMsg = "Failed to run agent";
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          errorMsg = JSON.stringify(err.response.data.detail);
+        } else {
+          errorMsg = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
     } finally {
       setRunning(false);
     }
