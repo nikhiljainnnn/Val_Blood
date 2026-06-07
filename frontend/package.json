@@ -10,6 +10,7 @@
     "deploy": "npm run build && aws s3 sync dist/ s3://YOUR_BUCKET_NAME_HERE"
   },
   "dependencies": {
+    "@types/three": "^0.184.1",
     "aws-amplify": "^6.17.0",
     "axios": "^1.7.2",
     "clsx": "^2.1.1",
@@ -21,6 +22,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.4",
     "recharts": "^2.12.7",
+    "three": "^0.184.0",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

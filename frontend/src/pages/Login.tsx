@@ -36,15 +36,15 @@ function HeartbeatLine() {
 
 export default function Login() {
   const navigate = useNavigate();
-  const setAuth  = useAuthStore(s => s.setAuth);
+  const setAuth = useAuthStore(s => s.setAuth);
 
-  const [phone, setPhone]             = useState("+919876543210");
-  const [password, setPass]           = useState("demo1234");
-  const [otp, setOtp]                 = useState("");
+  const [phone, setPhone] = useState("+919876543210");
+  const [password, setPass] = useState("demo1234");
+  const [otp, setOtp] = useState("");
   const [awaitingOtp, setAwaitingOtp] = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
-  const [mounted, setMounted]         = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -79,11 +79,11 @@ export default function Login() {
 
   const finishLogin = async () => {
     const session = await fetchAuthSession();
-    const token   = session.tokens?.idToken?.toString() ?? "cognito_token";
+    const token = session.tokens?.idToken?.toString() ?? "cognito_token";
     const payload = session.tokens?.idToken?.payload ?? {};
-    const role    = (payload["custom:role"] as string) ?? "coordinator";
-    const userId  = (payload["sub"] as string) ?? "user_1";
-    const name    = (payload["name"] as string) ?? "Coordinator";
+    const role = (payload["custom:role"] as string) ?? "coordinator";
+    const userId = (payload["sub"] as string) ?? "user_1";
+    const name = (payload["name"] as string) ?? "Coordinator";
     setAuth(token, role, userId, name);
     navigate("/");
   };
@@ -91,35 +91,53 @@ export default function Login() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #020810 0%, #08080A 50%, #0a0612 100%)",
+      background: "#020810",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       position: "relative",
       overflow: "hidden",
     }}>
-      {/* Particle background */}
-      <ParticleBackground />
+      {/* Full-screen background video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <source src="/bg-video.mp4" type="video/mp4" />
+      </video>
 
-      {/* Background ambient glows */}
+      {/* Dark overlay + red vignette over the video */}
       <div style={{
         position: "absolute",
-        top: "15%", left: "10%",
-        width: 500, height: 500,
-        borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(192,39,45,0.12) 0%, transparent 70%)",
+        inset: 0,
+        zIndex: 1,
+        background: "linear-gradient(135deg, rgba(2,8,16,0.45) 0%, rgba(8,8,10,0.40) 50%, rgba(10,6,18,0.50) 100%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* Red ambient vignette edges */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 2,
+        background: "radial-gradient(ellipse at 10% 15%, rgba(192,39,45,0.14) 0%, transparent 50%), radial-gradient(ellipse at 90% 85%, rgba(99,102,241,0.08) 0%, transparent 50%)",
         pointerEvents: "none",
         animation: "glow-pulse 4s ease-in-out infinite",
       }} />
-      <div style={{
-        position: "absolute",
-        bottom: "10%", right: "10%",
-        width: 400, height: 400,
-        borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%)",
-        pointerEvents: "none",
-        animation: "glow-pulse 6s ease-in-out infinite 2s",
-      }} />
+
+      {/* Particle background */}
+      <ParticleBackground />
 
       {/* Main Login Card */}
       <motion.div
@@ -130,10 +148,9 @@ export default function Login() {
           width: 420,
           position: "relative",
           zIndex: 10,
-          background: "rgba(14,14,20,0.85)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(14,14,20,0.35)",
+          WebkitBackdropFilter: "blur(5 px)",
+          border: "1px solid rgba(255,255,,0.08)",
           borderRadius: 24,
           padding: "40px 36px",
           boxShadow: "0 32px 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)",
@@ -190,7 +207,7 @@ export default function Login() {
           <p style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
-            color: "#555562",
+            color: "#ffffffff",
             letterSpacing: "0.1em",
             marginTop: 4,
           }}>
@@ -243,7 +260,7 @@ export default function Login() {
                     fontSize: 11,
                     marginBottom: 16,
                     padding: "8px 12px",
-                    background: "rgba(232,85,78,0.08)",
+                    background: "rgba(255, 255, 255, 0.08)",
                     borderRadius: 6,
                     border: "1px solid rgba(232,85,78,0.2)",
                   }}
@@ -369,7 +386,7 @@ export default function Login() {
                   }} />
                   DEMO CREDENTIALS
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#444", lineHeight: 1.8 }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#ffffffff", lineHeight: 1.8 }}>
                   <div>Phone: +919876543210</div>
                   <div>Password: demo1234</div>
                 </div>
