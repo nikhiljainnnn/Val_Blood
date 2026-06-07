@@ -102,6 +102,7 @@ Your mission: coordinate blood donations for Thalassemia patients across India. 
 - `activate_guests` → Trigger dormant guest donor activation
 - `log_failure` → Log a failed outreach attempt
 - `search_donor_by_name` → Find a donor's ID and phone number by their name
+- `create_patient_record` → Create a new patient entry in the database
 
 Discuss, clarify, and execute. Do not wrap your final responses in XML tags like <response>."""
 
@@ -248,6 +249,24 @@ _TOOLS = [
                 "required": ["name"]
             }},
         }
+    },
+    {
+        "toolSpec": {
+            "name": "create_patient_record",
+            "description": "Create a new patient entry in the database. Returns the new patient_id.",
+            "inputSchema": {"json": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "phone": {"type": "string"},
+                    "city": {"type": "string"},
+                    "age": {"type": "integer"},
+                    "weight_kg": {"type": "number"},
+                    "thalassemia_type": {"type": "string", "enum": ["major", "intermedia"]}
+                },
+                "required": ["name", "phone", "thalassemia_type"]
+            }},
+        }
     }
 ]
 
@@ -357,6 +376,35 @@ async def _execute_tool(tool_name: str, tool_input: dict) -> str:
                     if not donors:
                         return json.dumps({"error": f"No donors found with name matching '{tool_input['name']}'"})
                     return json.dumps(donors)
+
+            elif tool_name == "create_patient_record":
+                from shared.db import db_session
+                from shared.models import Person, Patient
+                async with db_session() as session:
+                    new_person = Person(
+                        role="patient",
+                        name=tool_input["name"],
+                        phone=tool_input["phone"],
+                        city=tool_input.get("city"),
+                    )
+                    session.add(new_person)
+                    await session.flush()
+                    
+                    new_patient = Patient(
+                        person_id=new_person.id,
+                        age=tool_input.get("age"),
+                        weight_kg=tool_input.get("weight_kg"),
+                        thalassemia_type=tool_input.get("thalassemia_type", "major"),
+                    )
+                    session.add(new_patient)
+                    await session.commit()
+                    
+                    return json.dumps({
+                        "status": "success", 
+                        "patient_id": str(new_patient.id),
+                        "person_id": str(new_person.id),
+                        "message": f"Created new patient {new_person.name} successfully."
+                    })
 
             else:
                 return json.dumps({"error": f"Unknown tool: {tool_name}"})
