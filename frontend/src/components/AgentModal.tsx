@@ -154,8 +154,9 @@ export default function AgentModal({
                   {(() => {
                     let responseText = result.response || "";
                     
-                    // Strip thinking tags so they don't appear in the final text at all
+                    // Strip thinking and response tags so they don't appear in the final text at all
                     responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+                    responseText = responseText.replace(/<\/?response>/g, "").trim();
 
                     return (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

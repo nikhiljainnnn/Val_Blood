@@ -361,7 +361,10 @@ async def api_agent_run(
     body: dict,
 ):
     from agent.orchestrator import run_supervisor
-    return await run_supervisor(body.get("task", ""), body.get("context", {}))
+    messages = body.get("messages")
+    if not messages:
+        messages = [{"role": "user", "content": [{"text": body.get("task", "")}]}]
+    return await run_supervisor(messages, body.get("context", {}))
 
 
 @app.post("/api/v1/agent/scheduled")

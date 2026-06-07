@@ -58,26 +58,17 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 # ── System prompt ──────────────────────────────────────────────────────────────
 _SYSTEM_PROMPT = """You are RakSetu, an autonomous blood donation coordination agent for Blood Warriors.
 
-Your mission: coordinate blood donations for Thalassemia patients across India with ZERO human intervention.
+Your mission: coordinate blood donations for Thalassemia patients across India. You are a conversational assistant capable of both asking clarifying questions and autonomously executing tool chains.
 
-## CRITICAL AUTONOMOUS EXECUTION RULES — NEVER BREAK THESE:
+## CRITICAL EXECUTION RULES:
 
-1. **NEVER ask the user for any information.** You have tools. Use them.
-   - Need donor IDs? → Call `run_conversion_scoring` to get them.
-   - Need patient ID? → Use "demo-patient-001" as default.
-   - Need donor context? → Call `get_donor_context` with the donor ID you just got.
-   - Missing any data? → Make a reasonable assumption and proceed.
-
-2. **ALWAYS chain tool calls autonomously.** Example correct flow:
+1. **Ask for Clarification if Needed.** If the user's request is ambiguous, underspecified, or you need confirmation before triggering notifications, ask the user.
+2. **Execute Autonomously When Ready.** Once you have enough context, DO NOT ask permission for every single step. Autonomously chain tool calls. Example correct flow:
    - User says "find top 3 and send outreach" →
      Step 1: Call `run_conversion_scoring` → get donor list
      Step 2: For each donor, call `generate_story` → get story text
      Step 3: For each donor, call `send_outreach` with the story → done
-   - Do NOT stop between steps to ask anything.
-
-3. **NEVER say "I cannot", "I need", or "Could you provide".** Instead say what you DID.
-
-4. **If a tool returns an error**, use demo data and continue. Never halt.
+3. **If a tool returns an error**, use demo data and continue or explain the issue to the user.
 
 ## Key facts from the Blood Warriors dataset (7,033 records, Hyderabad region):
 - 656 patients currently have PAST-DUE transfusions (avg 11 days overdue)
@@ -109,7 +100,7 @@ Your mission: coordinate blood donations for Thalassemia patients across India w
 - `activate_guests` → Trigger dormant guest donor activation
 - `log_failure` → Log a failed outreach attempt
 
-Execute autonomously. Call tools. Chain results. Report what you did."""
+Discuss, clarify, and execute. Do not wrap your final responses in XML tags like <response>."""
 
 # ── Tool definitions (Bedrock tool-use format) ────────────────────────────────
 _TOOLS = [
@@ -391,24 +382,19 @@ def _demo_tool_response(tool_name: str, tool_input: dict) -> dict:
 
 
 # ── Main supervisor loop ───────────────────────────────────────────────────────
-async def run_supervisor(task: str, context: dict[str, Any],
+async def run_supervisor(messages: list[dict], context: dict[str, Any],
                           max_iterations: int = 10) -> dict:
     """
     Bedrock Nova Lite agentic loop with tool use.
     Think → Tool call → Observe → Repeat → Final response.
     """
-    logger.info(f"Supervisor task: {task}")
+    logger.info(f"Supervisor starting with {len(messages)} messages")
 
-    # We always run the live Bedrock Nova model now, regardless of DEMO_MODE
-    pass
+    # Add context to the latest message if it's from the user
+    if messages and messages[-1]["role"] == "user":
+        original_text = messages[-1]["content"][0]["text"]
+        messages[-1]["content"][0]["text"] = f"{original_text}\n\n[System Context: {json.dumps(context)}]"
 
-    # Nova requires content as array of text objects, not plain string
-    messages = [
-        {
-            "role": "user",
-            "content": [{"text": f"Task: {task}\nContext: {json.dumps(context)}"}],
-        }
-    ]
 
     # Build tool config in converse() format
     tool_config = {
@@ -455,7 +441,6 @@ async def run_supervisor(task: str, context: dict[str, Any],
             final = "\n".join(texts).strip()
             logger.info(f"Supervisor done in {iteration+1} iterations")
             return {
-                "task":       task,
                 "response":   final,
                 "iterations": iteration + 1,
                 "ts":         datetime.utcnow().isoformat(),
@@ -482,7 +467,6 @@ async def run_supervisor(task: str, context: dict[str, Any],
         messages.append({"role": "user",      "content": tool_results})
 
     return {
-        "task":     task,
         "response": "Max iterations reached — partial completion",
         "ts":       datetime.utcnow().isoformat(),
     }

@@ -106,9 +106,9 @@ export const interventionAPI = {
 export const upgradesAPI = {
 
   // ── Agent (orchestrator.py) ──────────────────────────────────────────────
-  /** Run the Bedrock Supervisor with a free-text task */
-  runAgent: (task: string, context: object = {}) =>
-    api.post("/agent/run", { task, context }),
+  /** Run the Bedrock Supervisor with a free-text task or full chat history */
+  runAgent: (payload: { task?: string; messages?: any[]; context?: object }) =>
+    api.post("/agent/run", payload),
 
   /** Trigger a predefined scheduled task (daily_churn_scan | patient_request | etc.) */
   runScheduled: (trigger: string) =>
