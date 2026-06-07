@@ -78,13 +78,18 @@ Write the message now:"""
     })
 
     try:
+        import asyncio
+        from functools import partial
         client   = get_bedrock_client()
-        response = client.invoke_model(
+        loop = asyncio.get_running_loop()
+        func = partial(
+            client.invoke_model,
             modelId=model_id,
             body=body,
             contentType="application/json",
             accept="application/json",
         )
+        response = await loop.run_in_executor(None, func)
         result = json.loads(response["body"].read())
         text   = result["output"]["message"]["content"][0]["text"].strip()
 
@@ -160,13 +165,18 @@ Message:"""
     })
 
     try:
+        import asyncio
+        from functools import partial
         client   = get_bedrock_client()
-        response = client.invoke_model(
+        loop = asyncio.get_running_loop()
+        func = partial(
+            client.invoke_model,
             modelId=NOVA_MICRO,
             body=body,
             contentType="application/json",
             accept="application/json",
         )
+        response = await loop.run_in_executor(None, func)
         result = json.loads(response["body"].read())
         text   = result["output"]["message"]["content"][0]["text"].strip()
         logger.info(f"Intervention message ({language}): {text[:80]}...")
@@ -217,13 +227,18 @@ Example: {{"intent": "confirm", "confidence": 0.92}}"""
     })
 
     try:
+        import asyncio
+        from functools import partial
         client   = get_bedrock_client()
-        response = client.invoke_model(
+        loop = asyncio.get_running_loop()
+        func = partial(
+            client.invoke_model,
             modelId=NOVA_MICRO,   # cheapest — simple classification task
             body=body,
             contentType="application/json",
             accept="application/json",
         )
+        response = await loop.run_in_executor(None, func)
         result = json.loads(response["body"].read())
         raw    = result["output"]["message"]["content"][0]["text"].strip()
         # Strip markdown fences if present
@@ -260,13 +275,18 @@ async def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     })
 
     try:
+        import asyncio
+        from functools import partial
         client   = get_bedrock_client()
-        response = client.invoke_model(
+        loop = asyncio.get_running_loop()
+        func = partial(
+            client.invoke_model,
             modelId=NOVA_LITE,
             body=body,
             contentType="application/json",
             accept="application/json",
         )
+        response = await loop.run_in_executor(None, func)
         result = json.loads(response["body"].read())
         return result["output"]["message"]["content"][0]["text"].strip()
     except Exception as e:
