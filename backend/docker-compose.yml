@@ -133,7 +133,7 @@ services:
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    redis://redis:6379/1
+      CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
       GUPSHUP_SOURCE_NUMBER: ${GUPSHUP_SOURCE_NUMBER:-}
       GUPSHUP_APP_NAME: BloodWarriors
@@ -161,8 +161,11 @@ services:
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    redis://redis:6379/1
+      CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
+      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION:             ${AWS_REGION:-us-east-1}
       DEMO_MODE:        ${DEMO_MODE:-true}
     depends_on:
       redis: { condition: service_healthy }
