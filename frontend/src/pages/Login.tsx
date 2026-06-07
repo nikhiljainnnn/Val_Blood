@@ -413,7 +413,7 @@ export default function Login() {
           whiteSpace: "nowrap",
         }}
       >
-        RAKSETU · 12-ANTIGEN GUARDIAN NETWORK · INDIA
+        VAL BLOOD · 12-ANTIGEN GUARDIAN NETWORK · INDIA
       </motion.div>
     </div>
   );

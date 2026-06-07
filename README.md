@@ -1,4 +1,4 @@
-# 🩸 RakSetu — Lifeline Bridge
+# 🩸 VAL BLOOD — Lifeline Bridge
 ### Blood Warriors · AI donor-patient matching · AWS + Bedrock edition
 
 ---
@@ -6,7 +6,7 @@
 ## Quick start (local demo, no AWS needed)
 
 ```bash
-tar -xzf raksetu_complete.tar.gz && cd raksetu
+tar -xzf VAL BLOOD_complete.tar.gz && cd VAL BLOOD
 cp .env.example .env          # DEMO_MODE=true by default
 cd backend && docker compose up postgres redis -d
 cd ../ml/synthetic_data && pip install asyncpg numpy pandas
