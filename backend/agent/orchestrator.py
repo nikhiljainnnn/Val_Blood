@@ -297,7 +297,7 @@ async def _execute_tool(tool_name: str, tool_input: dict) -> str:
                 r = await client.post(
                     f"{SERVICES['notification']}/notify/donor",
                     json={
-                        "donor_id": tool_input["donor_id"],
+                        "donor_id": tool_input.get("donor_id", ""),
                         "phone":    tool_input.get("phone", ""),
                         "message":  tool_input.get("message", ""),
                         "channel":  tool_input.get("channel", "whatsapp"),
