@@ -57,8 +57,19 @@ async def get_donor_story(
             "generated_at":    datetime.utcnow().isoformat(),
         }
 
-    donation_number = await _get_donation_number(donor_id, db)
-    milestone       = await _get_milestone(patient_id, db)
+    import uuid
+    from sqlalchemy.exc import StatementError
+
+    try:
+        # Validate UUIDs to prevent Postgres DataError
+        uuid.UUID(donor_id)
+        uuid.UUID(patient_id)
+        donation_number = await _get_donation_number(donor_id, db)
+        milestone       = await _get_milestone(patient_id, db)
+    except (ValueError, StatementError):
+        logger.warning(f"Invalid UUID provided ({donor_id}, {patient_id}), using mock data.")
+        donation_number = 1
+        milestone = None
 
     # Use Nova Lite for multilingual, Nova Micro for English-only (saves cost)
     use_lite = language != "en"

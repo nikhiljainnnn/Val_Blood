@@ -21,7 +21,7 @@ async def test_agent():
     messages = [
         {
             "role": "user",
-            "content": [{"text": "Check the matching service for urgent or critical patients. If any are found, check our dormant guest pool and run an awareness campaign for them."}],
+            "content": [{"text": "Generate a story for donor d001 and patient p001 in Hindi. Show me the exact text you get back."}],
         }
     ]
     

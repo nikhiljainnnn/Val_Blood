@@ -242,11 +242,9 @@ _TOOLS = [
 async def _execute_tool(tool_name: str, tool_input: dict) -> str:
     """Route tool call to the appropriate existing FastAPI microservice."""
     # Ensure all tool calls go through the real HTTP network stack to test microservices
-    pass
-
-
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        import httpx
+        async with httpx.AsyncClient(timeout=60.0) as client:
 
             if tool_name == "match_donors":
                 r = await client.post(
@@ -327,8 +325,8 @@ async def _execute_tool(tool_name: str, tool_input: dict) -> str:
                 return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
     except Exception as e:
-        logger.error(f"Tool {tool_name} call failed: {e}")
-        return json.dumps({"error": str(e), "tool": tool_name})
+        logger.error(f"Tool {tool_name} call failed: {repr(e)}")
+        return json.dumps({"error": repr(e), "tool": tool_name})
 
 
 def _demo_tool_response(tool_name: str, tool_input: dict) -> dict:
