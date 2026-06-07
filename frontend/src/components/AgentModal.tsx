@@ -153,32 +153,12 @@ export default function AgentModal({
                   {/* Clean up and format the response text */}
                   {(() => {
                     let responseText = result.response || "";
-                    let thinkingText = "";
                     
-                    const thinkMatch = responseText.match(/<thinking>([\s\S]*?)<\/thinking>/);
-                    if (thinkMatch) {
-                      thinkingText = thinkMatch[1].trim();
-                      responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/, "").trim();
-                    }
+                    // Strip thinking tags so they don't appear in the final text at all
+                    responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
 
                     return (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {thinkingText && (
-                          <div style={{
-                            background: "rgba(255,255,255,0.03)",
-                            border: "1px solid var(--border-light)",
-                            borderRadius: 12,
-                            padding: "12px 16px",
-                          }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase" }}>
-                              <BrainCircuit size={12} /> Agent Thinking Process
-                            </div>
-                            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", whiteSpace: "pre-wrap", fontStyle: "italic" }}>
-                              {thinkingText}
-                            </div>
-                          </div>
-                        )}
-                        
                         {responseText && (
                           <div style={{
                             background: "var(--navy-1)",

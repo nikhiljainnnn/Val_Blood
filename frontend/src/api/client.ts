@@ -7,7 +7,8 @@ const PRED_URL = API_CONFIG.predURL;
 
 // ── Demo mode: skip real API calls if no backend ─────────────────────────────
 // Set VITE_DEMO_MODE=true in .env, or the app auto-detects backend unavailability.
-export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true" || true;
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+
 
 const baseConfig = {
   baseURL: BASE_URL,
