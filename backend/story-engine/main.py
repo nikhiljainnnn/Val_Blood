@@ -11,7 +11,11 @@ from datetime import datetime
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
+
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
 
 from shared.db import get_db, init_db
 from shared.models import PatientMilestone, Donor, Patient, GuardianCircle

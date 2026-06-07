@@ -16,6 +16,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
+
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware

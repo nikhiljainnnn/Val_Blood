@@ -20,6 +20,10 @@ from celery import Celery
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
+
 from shared.db import get_db, init_db
 from shared.models import DonorSignal, Person, Donor
 from shared.redis_client import get_redis

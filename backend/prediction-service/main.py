@@ -19,6 +19,11 @@ import numpy as np
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func
+import math
+
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
 
 from shared.db import get_db, init_db
 from shared.models import Donor, Person, DonorSignal, TransfusionEvent, Patient, GuardianCircle, TransfusionRequest

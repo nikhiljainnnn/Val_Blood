@@ -13,6 +13,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
 from datetime import datetime
 
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
+
 from sarvam_client import SarvamClient
 from ivr_flow import IVRSession, IVRState
 from shared.redis_client import get_redis

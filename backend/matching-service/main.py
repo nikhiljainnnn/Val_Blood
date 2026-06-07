@@ -12,6 +12,10 @@ from sqlalchemy import select, and_
 from datetime import datetime
 import uuid
 
+# Load secrets from SSM Parameter Store before initializing anything else
+from shared.ssm_loader import load_ssm_parameters
+load_ssm_parameters()
+
 from shared.db import get_db, init_db
 from shared.models import (
     Patient, Donor, Person, AntigenProfile,

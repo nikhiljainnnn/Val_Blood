@@ -3,25 +3,6 @@ version: "3.9"
 services:
 
   # ─── Infrastructure ─────────────────────────────────────────────────────────
-  postgres:
-    image: postgres:15-alpine
-    container_name: raksetu-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB:       raksetu
-      POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: raksetu_dev
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ../infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d raksetu"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     container_name: raksetu-redis
@@ -47,7 +28,7 @@ services:
       - ./lambdas:/lambdas
       - ./agent:/agent
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:        redis://redis:6379
       JWT_SECRET:       ${JWT_SECRET:-dev_secret_change_in_production_32chars}
       JWT_ALGORITHM:    HS256
@@ -60,6 +41,7 @@ services:
       STORY_URL:        http://story-engine:8007
       ANALYTICS_URL:    http://analytics-service:8008
       DEMO_MODE:        ${DEMO_MODE:-true}
+      USE_SSM:          ${USE_SSM:-false}
       # ── Bedrock / Agent ────────────────────────────────────────────
       BEDROCK_LITE_MODEL_ID:       ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
       BEDROCK_MICRO_MODEL_ID:      ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
@@ -71,7 +53,6 @@ services:
       MEMORY_CONTEXT_SIZE:         "10"
       DYNAMO_FAILURE_LOG_TABLE:    raksetu-failure-log
     depends_on:
-      postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   matching-service:
@@ -85,11 +66,10 @@ services:
     volumes:
       - ./matching-service/models:/app/matching-service/models
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:    redis://redis:6379
       DEMO_MODE:    ${DEMO_MODE:-true}
     depends_on:
-      postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   prediction-service:
@@ -105,7 +85,7 @@ services:
       - ./prediction-service/models:/app/prediction-service/models
       - ./lambdas:/lambdas
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:    redis://redis:6379
       DEMO_MODE:    ${DEMO_MODE:-true}
       # ── Bedrock / Upgrade 4 ────────────────────────────────────────────────
@@ -116,7 +96,6 @@ services:
       S3_BUCKET:               ${S3_BUCKET:-raksetu-models}
       NOTIFICATION_URL:        http://notification-service:8003
     depends_on:
-      postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   notification-service:
@@ -131,7 +110,7 @@ services:
     volumes:
       - ./lambdas:/lambdas
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:        redis://redis:6379
       CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
@@ -139,6 +118,7 @@ services:
       GUPSHUP_APP_NAME: BloodWarriors
       STORY_URL:        http://story-engine:8007
       DEMO_MODE:        ${DEMO_MODE:-true}
+      USE_SSM:          ${USE_SSM:-false}
       # ── Bedrock / Upgrades 1,3,5 ──────────────────────────────────────
       BEDROCK_LITE_MODEL_ID:  ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
       BEDROCK_MICRO_MODEL_ID: ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
@@ -148,7 +128,6 @@ services:
       MEMORY_CONTEXT_SIZE:    "10"
       NOTIFICATION_URL:       http://notification-service:8003
     depends_on:
-      postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   celery-worker:
@@ -159,7 +138,7 @@ services:
     restart: unless-stopped
     command: celery -A main.celery_app worker --loglevel=info --concurrency=4
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:        redis://redis:6379
       CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
@@ -167,6 +146,7 @@ services:
       AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
       AWS_REGION:             ${AWS_REGION:-us-east-1}
       DEMO_MODE:        ${DEMO_MODE:-true}
+      USE_SSM:          ${USE_SSM:-false}
     depends_on:
       redis: { condition: service_healthy }
 
@@ -179,13 +159,14 @@ services:
     ports:
       - "8004:8004"
     environment:
-      DATABASE_URL:          postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       SARVAM_API_KEY:        ${SARVAM_API_KEY:-}
       EXOTEL_SID:            ${EXOTEL_SID:-}
       EXOTEL_TOKEN:          ${EXOTEL_TOKEN:-}
       EXOTEL_CALLER_ID:      ${EXOTEL_CALLER_ID:-}
       VOICE_CALLBACK_URL:    http://voice-service:8004/call/dtmf-webhook
       DEMO_MODE:             ${DEMO_MODE:-true}
+      USE_SSM:               ${USE_SSM:-false}
       DEMO_AUDIO_BASE_URL:   http://voice-service:8004/static
     depends_on:
       redis: { condition: service_healthy }
@@ -216,7 +197,7 @@ services:
     ports:
       - "8007:8007"
     environment:
-      DATABASE_URL:    postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL:       redis://redis:6379
       GEMINI_API_KEY:  ${GEMINI_API_KEY:-}
       DEMO_MODE:       ${DEMO_MODE:-true}
@@ -226,20 +207,8 @@ services:
       AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
       AWS_REGION:             ${AWS_REGION:-us-east-1}
     depends_on:
-      postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
-  # ─── Frontend ────────────────────────────────────────────────────────────────
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-    container_name: raksetu-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    depends_on:
-      - api-gateway
 
   # ─── Federated nodes (demo: 2 simulated hospital nodes) ──────────────────────
   fl-node-hospital-1:
