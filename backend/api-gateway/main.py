@@ -253,6 +253,64 @@ async def get_guardian_circle(
     return await _proxy("matching", f"/guardian-circle/{patient_id}")
 
 
+@app.get("/api/v1/patients")
+async def get_all_patients(
+    db: AsyncSession = Depends(get_db),
+    user: TokenData = Depends(get_current_user)
+):
+    # Get all patients ordered by newest first
+    result = await db.execute(
+        select(Patient, Person)
+        .join(Person, Patient.person_id == Person.id)
+        .order_by(Patient.created_at.desc())
+    )
+    rows = result.all()
+    patients = []
+    for pat, per in rows:
+        patients.append({
+            "id": pat.id,
+            "name": per.name,
+            "age": pat.age,
+            "city": per.city,
+            "hospital": "Mumbai Thalassemia Center", # Defaulting for now
+            "thalassemia_type": pat.thalassemia_type,
+            "transfusion_interval_days": pat.transfusion_interval_days
+        })
+    return patients
+
+
+@app.get("/api/v1/patients/{patient_id}")
+async def get_patient_by_id(
+    patient_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: TokenData = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Patient, Person, AntigenProfile)
+        .join(Person, Patient.person_id == Person.id)
+        .outerjoin(AntigenProfile, AntigenProfile.person_id == Person.id)
+        .where(Patient.id == patient_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    pat, per, profile = row
+    return {
+        "id": pat.id,
+        "name": per.name,
+        "age": pat.age,
+        "city": per.city,
+        "hospital": "Mumbai Thalassemia Center", # Default
+        "thalassemia_type": pat.thalassemia_type,
+        "transfusion_interval_days": pat.transfusion_interval_days,
+        "abo": profile.abo if profile else "B",
+        "rh_d": profile.rh_d if profile else True,
+        "total_transfusions": 12, # Demo value
+        "circle_health": 0.92     # Demo value
+    }
+
+
 @app.get("/api/v1/churn/batch")
 async def get_churn_predictions(
     user: TokenData = Depends(get_current_user),

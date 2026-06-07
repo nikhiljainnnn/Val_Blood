@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { matchingAPI } from "@/api/client";
-import GuardianCircle from "@/components/GuardianCircle";
-import HbForecastChart from "@/components/HbForecastChart";
-import CompatScore from "@/components/CompatScore";
+import { matchingAPI, patientAPI } from "../api/client";
+import GuardianCircle from "../components/GuardianCircle";
+import HbForecastChart from "../components/HbForecastChart";
+import CompatScore from "../components/CompatScore";
 import { Droplets, Shield, AlertTriangle, Activity, X, CheckCircle, Loader2, ChevronRight } from "lucide-react";
 
 const DEMO_PATIENT = {
@@ -39,7 +40,7 @@ function TransfusionModal({
   donor, patient, onClose,
 }: {
   donor: Donor | null;
-  patient: typeof DEMO_PATIENT;
+  patient: any;
   onClose: () => void;
 }) {
   const [step, setStep] = useState<ModalStep>("confirm");
@@ -61,7 +62,6 @@ function TransfusionModal({
       setLog(prev => [...prev, s.msg]);
     }
 
-    // Try real API, silently fall through to demo on failure
     try {
       await matchingAPI.createRequest({
         patient_id: patient.id,
@@ -70,7 +70,7 @@ function TransfusionModal({
         urgency:    "urgent",
         units_needed: 1,
       });
-    } catch { /* demo mode — backend may not be running */ }
+    } catch { /* demo mode fallback */ }
 
     setStep("done");
   };
@@ -97,7 +97,6 @@ function TransfusionModal({
           position: "relative",
         }}
       >
-        {/* Close */}
         {step !== "processing" && (
           <button onClick={onClose} style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"var(--text-muted)", cursor:"pointer" }}>
             <X size={18} />
@@ -105,8 +104,6 @@ function TransfusionModal({
         )}
 
         <AnimatePresence mode="wait">
-
-          {/* ── Step 1: Confirm ── */}
           {step === "confirm" && (
             <motion.div key="confirm" initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}>
               <div className="section-label" style={{ marginBottom: 8 }}>Transfusion Request</div>
@@ -114,7 +111,6 @@ function TransfusionModal({
                 Confirm Blood Request
               </div>
 
-              {/* Patient */}
               <div className="card" style={{ padding:"14px 16px", marginBottom:12, background:"var(--surface-2)" }}>
                 <div style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--text-muted)", letterSpacing:"0.1em", marginBottom:8 }}>PATIENT</div>
                 <div style={{ fontWeight:700, marginBottom:4 }}>{patient.name}</div>
@@ -123,12 +119,10 @@ function TransfusionModal({
                 </div>
               </div>
 
-              {/* Arrow */}
               <div style={{ textAlign:"center", color:"var(--text-muted)", marginBottom:12 }}>
                 <ChevronRight size={18} style={{ transform:"rotate(90deg)", display:"inline-block" }} />
               </div>
 
-              {/* Donor (or auto-select top) */}
               <div style={{
                 padding:"14px 16px", borderRadius:12, marginBottom:24,
                 background: donor ? "var(--crimson-dim)" : "var(--surface-2)",
@@ -163,7 +157,6 @@ function TransfusionModal({
                 )}
               </div>
 
-              {/* Cascade info */}
               <div style={{ padding:"12px 14px", borderRadius:10, background:"var(--info-dim)", border:"1px solid rgba(99,102,241,0.15)", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--text-muted)", marginBottom:24, lineHeight:1.7 }}>
                 <span style={{ color:"var(--info)", fontWeight:600 }}>Cascade: </span>
                 WhatsApp → SMS → Voice call (Sarvam AI, {donor?.language?.toUpperCase() || "HI"})
@@ -181,7 +174,6 @@ function TransfusionModal({
             </motion.div>
           )}
 
-          {/* ── Step 2: Processing ── */}
           {step === "processing" && (
             <motion.div key="processing" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}>
               <div style={{ textAlign:"center", marginBottom:28 }}>
@@ -214,7 +206,6 @@ function TransfusionModal({
             </motion.div>
           )}
 
-          {/* ── Step 3: Done ── */}
           {step === "done" && (
             <motion.div key="done" initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0 }}>
               <div style={{ textAlign:"center", padding:"12px 0 28px" }}>
@@ -229,7 +220,6 @@ function TransfusionModal({
                 </div>
               </div>
 
-              {/* Timeline */}
               <div style={{ background:"var(--surface-2)", borderRadius:12, padding:"14px 16px", marginBottom:24 }}>
                 {[
                   { label:"Donor notified",     status:"done" },
@@ -262,16 +252,66 @@ function TransfusionModal({
 
 // ── Main PatientView ──────────────────────────────────────────────────────────
 export default function PatientView() {
-  const patientId = "demo-patient-001";
-  const [circle]                      = useState(DEMO_CIRCLE);
-  const [patient]                     = useState(DEMO_PATIENT);
+  const { id } = useParams<{ id: string }>();
+  const [patientId, setPatientId] = useState(id || "demo-patient-001");
+  const [circle, setCircle]           = useState<any[]>(DEMO_CIRCLE);
+  const [patient, setPatient]         = useState<any>(DEMO_PATIENT);
   const [selectedDonor, setSelected]  = useState<Donor | null>(null);
   const [activeTab, setActiveTab]     = useState<"circle"|"forecast"|"compat">("circle");
   const [showModal, setShowModal]     = useState(false);
+  const [loading, setLoading]         = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        let currentId = id;
+        
+        // Fetch patient
+        if (currentId) {
+          const pRes = await patientAPI.getPatient(currentId);
+          setPatient(pRes.data);
+        } else {
+          const listRes = await patientAPI.getPatients();
+          if (listRes.data && listRes.data.length > 0) {
+            currentId = listRes.data[0].id;
+            setPatientId(currentId);
+            const pRes = await patientAPI.getPatient(currentId);
+            setPatient(pRes.data);
+          }
+        }
+        
+        // Fetch circle
+        if (currentId) {
+          try {
+            const cRes = await matchingAPI.getGuardianCircle(currentId);
+            setCircle(cRes.data?.donors || []);
+          } catch (e: any) {
+            if (e.response && e.response.status === 404) {
+              // Circle doesn't exist yet, build it
+              await matchingAPI.buildCircle(currentId);
+              const cRes = await matchingAPI.getGuardianCircle(currentId);
+              setCircle(cRes.data?.donors || []);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load patient data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [id]);
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Loading Patient Profile...</div>;
+  }
 
   const atRiskCount   = circle.filter(d => d.churn_probability > 0.6).length;
   const eligibleCount = circle.filter(d => d.days_to_eligible === 0).length;
-  const circleHealth  = Math.round(patient.circle_health * 100);
+  const circleHealth  = Math.round((patient.circle_health || 0.92) * 100);
 
   return (
     <div>

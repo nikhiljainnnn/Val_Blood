@@ -87,6 +87,8 @@ export const donorAPI = {
 
 export const patientAPI = {
   getUrgent: () => api.get("/patients/urgent"),
+  getPatients: () => api.get("/patients"),
+  getPatient: (id: string) => api.get(`/patients/${id}`),
 };
 
 export const demoAPI = {

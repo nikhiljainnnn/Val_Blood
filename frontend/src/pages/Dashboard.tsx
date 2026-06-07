@@ -100,17 +100,25 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [agentOpen, setAgentOpen] = useState(false);
   const [circle, setCircle] = useState<any[]>([]);
+  const [latestPatientId, setLatestPatientId] = useState<string>("demo-patient-001");
   const [statsData, setStatsData] = useState({
     active_patients: 0, active_donors: 0, guardian_circles: 0,
     at_risk_donors: 0, open_requests: 0, transfusions_this_month: 0,
   });
 
   useEffect(() => {
-    import("../api/client").then(({ matchingAPI, demoAPI }) => {
-      // Fetch guardian circle donors
-      matchingAPI.getGuardianCircle("demo-patient-001")
-        .then(res => setCircle(res.data?.donors || []))
-        .catch(console.error);
+    import("../api/client").then(({ matchingAPI, demoAPI, patientAPI }) => {
+      // Fetch latest patient
+      patientAPI.getPatients().then(res => {
+        if (res.data && res.data.length > 0) {
+          const latestId = res.data[0].id;
+          setLatestPatientId(latestId);
+          // Fetch guardian circle for latest patient
+          matchingAPI.getGuardianCircle(latestId)
+            .then(res => setCircle(res.data?.donors || []))
+            .catch(console.error);
+        }
+      }).catch(console.error);
 
       // Fetch live dashboard stats
       demoAPI.getDemoSummary()
@@ -180,7 +188,7 @@ export default function Dashboard() {
             className="btn-primary" style={{ padding:"9px 18px", background: "var(--navy-3)", border: "1px solid var(--border-light)" }}>
             <Activity size={14} /> Run Agent
           </motion.button>
-          <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate("/patient/demo-patient-001")}
+          <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate(`/patient/${latestPatientId}`)}
             className="btn-primary" style={{ padding:"9px 18px" }}>
             <Droplets size={14} /> View Patient
           </motion.button>
