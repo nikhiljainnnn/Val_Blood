@@ -225,6 +225,16 @@ _TOOLS = [
             }},
         }
     },
+    {
+        "toolSpec": {
+            "name": "run_awareness_campaign",
+            "description": "Trigger the blood group awareness campaign for users with unknown blood groups. Sends personalized messages about nearby camps.",
+            "inputSchema": {"json": {
+                "type": "object",
+                "properties": {},
+            }},
+        }
+    },
 ]
 
 
