@@ -428,15 +428,22 @@ async def run_supervisor(messages: list[dict], context: dict[str, Any],
         return _demo_supervisor_response(task, context)
 
     for iteration in range(max_iterations):
+        import asyncio
+        from functools import partial
+        
         try:
             # converse() is the correct API for Nova tool-use (not invoke_model)
-            resp = bedrock.converse(
+            # Run the synchronous boto3 call in a thread pool to avoid blocking FastAPI
+            loop = asyncio.get_running_loop()
+            func = partial(
+                bedrock.converse,
                 modelId=LITE_MODEL,
                 system=[{"text": _SYSTEM_PROMPT}],
                 messages=messages,
                 toolConfig=tool_config,
                 inferenceConfig={"maxTokens": 1000, "temperature": 0.3},
             )
+            resp = await loop.run_in_executor(None, func)
             result = resp
         except Exception as e:
             logger.error(f"Bedrock converse error (iter {iteration}): {e}")
