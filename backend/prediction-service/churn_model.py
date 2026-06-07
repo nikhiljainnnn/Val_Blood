@@ -178,6 +178,8 @@ class DonorChurnPredictor:
             "is_festival_month":         int(month in [10, 11, 1, 2]),
             "month_sin":                 float(np.sin(2 * np.pi * month / 12)),
             "month_cos":                 float(np.cos(2 * np.pi * month / 12)),
+            "calls_to_donations_ratio":  count_signal("call_answered") / max(len(donations), 1),
+            "donated_earlier_flag":      1 if (donor_row[0] or 0) > 0 else 0,
         }
 
     @staticmethod
