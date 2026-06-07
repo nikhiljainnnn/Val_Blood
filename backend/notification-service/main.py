@@ -95,7 +95,7 @@ async def notify_donor(
 
     person, donor = row
     lang  = person.language or "hi"
-    phone = person.phone
+    phone = body.get("phone") or person.phone
 
     # Pull patient story from cache / story engine
     story = await _get_story(body.get("donor_id"), body.get("patient_id"), lang)
