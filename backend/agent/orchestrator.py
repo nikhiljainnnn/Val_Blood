@@ -100,6 +100,7 @@ Your mission: coordinate blood donations for Thalassemia patients across India. 
 - `get_urgency_summary` → Get current emergency dashboard stats
 - `activate_guests` → Trigger dormant guest donor activation
 - `log_failure` → Log a failed outreach attempt
+- `search_donor_by_name` → Find a donor's ID and phone number by their name
 
 Discuss, clarify, and execute. Do not wrap your final responses in XML tags like <response>."""
 
@@ -236,6 +237,17 @@ _TOOLS = [
             }},
         }
     },
+    {
+        "toolSpec": {
+            "name": "search_donor_by_name",
+            "description": "Search the database for a donor by their name to retrieve their donor_id and phone number.",
+            "inputSchema": {"json": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"]
+            }},
+        }
+    }
 ]
 
 
@@ -321,6 +333,29 @@ async def _execute_tool(tool_name: str, tool_input: dict) -> str:
                     params={"top_n": tool_input.get("top_n", 50)},
                 )
                 return r.text
+
+            elif tool_name == "search_donor_by_name":
+                from shared.db import async_session_maker
+                from sqlalchemy import select
+                from shared.models import Donor, Person
+                async with async_session_maker() as session:
+                    result = await session.execute(
+                        select(Donor, Person)
+                        .join(Person, Donor.person_id == Person.id)
+                        .where(Person.name.ilike(f"%{tool_input['name']}%"))
+                        .limit(5)
+                    )
+                    donors = []
+                    for donor, person in result.all():
+                        donors.append({
+                            "donor_id": str(donor.id),
+                            "name": person.name,
+                            "phone": person.phone,
+                            "blood_group": person.blood_group,
+                        })
+                    if not donors:
+                        return json.dumps({"error": f"No donors found with name matching '{tool_input['name']}'"})
+                    return json.dumps(donors)
 
             else:
                 return json.dumps({"error": f"Unknown tool: {tool_name}"})
