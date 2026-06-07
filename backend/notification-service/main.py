@@ -25,6 +25,7 @@ from shared.models import DonorSignal, Person, Donor
 from shared.redis_client import get_redis
 from shared.schemas import NotificationIn, NotificationOut
 from gupshup_client import GupshupClient
+from sns_client import SNSClient
 from templates import get_template, get_sms_template
 
 # ── Upgrade wiring ────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ celery_app.conf.worker_prefetch_multiplier = 1
 async def lifespan(app: FastAPI):
     await init_db()
     app.state.gupshup = GupshupClient()
+    app.state.sns = SNSClient()
     logger.info("Notification service started")
     yield
 
@@ -151,8 +153,9 @@ async def notify_donor(
 
     # For critical/urgent: also fire SMS immediately
     if body.get("urgency") in ["urgent", "critical"]:
+        sns = app.state.sns
         sms_msg = get_sms_template(lang, person.name, slot)
-        await gupshup.send_sms(phone, sms_msg)
+        await sns.send_sms(phone, sms_msg)
         channels_fired.append("sms")
 
     # Schedule fallback escalations via Celery
@@ -260,28 +263,31 @@ def _schedule_sms_fallback(self, notification_id: str, donor_id: str, phone: str
         return
 
     sms_msg = get_sms_template(lang, "Donor", slot)
-    import requests
-    gupshup_api_key = os.getenv("GUPSHUP_API_KEY", "")
-    # Sync HTTP call inside Celery task
+    import boto3
+    import os
+    
+    DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
+    
+    # Sync publish inside Celery task
     try:
-        requests.post(
-            "https://api.gupshup.io/sm/api/v1/msg",
-            data={
-                "channel":  "sms",
-                "source":   os.getenv("GUPSHUP_SOURCE_NUMBER", ""),
-                "destination": phone,
-                "message":  sms_msg,
-                "src.name": "BloodWarriors",
-            },
-            headers={"apikey": gupshup_api_key},
-            timeout=10,
-        )
-        logger.info(f"SMS fallback sent to {phone}")
+        if DEMO_MODE:
+            logger.info(f"[DEMO SNS Fallback] SMS to {phone}: {sms_msg[:80]}...")
+        else:
+            sns_client = boto3.client(
+                "sns",
+                region_name=os.getenv("AWS_REGION", "us-east-1"),
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            )
+            formatted_phone = phone if phone.startswith("+") else f"+{phone}"
+            sns_client.publish(PhoneNumber=formatted_phone, Message=sms_msg)
+            
+        logger.info(f"SNS fallback sent to {phone}")
         # Update state
         state["channel"] = "sms"
         r.setex(f"notif:state:{notification_id}", 86400, json.dumps(state))
     except Exception as e:
-        logger.error(f"SMS fallback error: {e}")
+        logger.error(f"SNS fallback error: {e}")
         raise self.retry(exc=e, countdown=300)
 
 
