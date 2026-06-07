@@ -335,10 +335,10 @@ async def _execute_tool(tool_name: str, tool_input: dict) -> str:
                 return r.text
 
             elif tool_name == "search_donor_by_name":
-                from shared.db import async_session_maker
+                from shared.db import db_session
                 from sqlalchemy import select
                 from shared.models import Donor, Person
-                async with async_session_maker() as session:
+                async with db_session() as session:
                     result = await session.execute(
                         select(Donor, Person)
                         .join(Person, Donor.person_id == Person.id)
