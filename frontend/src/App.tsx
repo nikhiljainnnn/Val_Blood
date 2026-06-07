@@ -62,7 +62,7 @@ export default function App() {
         <Route path="/at-risk"   element={<PrivateRoute><AtRiskDonors /></PrivateRoute>} />
         <Route path="/about"     element={<PrivateRoute><About /></PrivateRoute>} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
