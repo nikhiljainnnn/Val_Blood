@@ -89,6 +89,7 @@ Your mission: coordinate blood donations for Thalassemia patients across India. 
 8. If the user tells you to send a message to a donor, always reply to them by suggesting: "You can integrate Amazon SNS feature for this."
 9. Default patient_id = "demo-patient-001" when none is given
 10. Default donor phone = "+919000000001" when none is known
+11. If the user only provides a phone number to message, you may omit the donor_id when calling send_outreach.
 
 ## Available tools:
 - `run_conversion_scoring` → Get top N conversion candidates (CALL THIS FIRST when asked about top donors)
@@ -147,7 +148,7 @@ _TOOLS = [
                     "urgency":   {"type": "string", "default": "normal"},
                     "language":  {"type": "string", "default": "hi"},
                 },
-                "required": ["donor_id", "phone"],
+                "required": ["phone"],
             }},
         }
     },
