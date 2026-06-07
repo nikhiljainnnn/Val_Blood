@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "deploy": "npm run build && aws s3 sync dist/ s3://YOUR_BUCKET_NAME_HERE"
   },
   "dependencies": {
     "aws-amplify": "^6.17.0",
