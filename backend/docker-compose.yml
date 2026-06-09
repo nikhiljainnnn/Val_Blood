@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: raksetu_dev
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ../infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     ports:
       - "5432:5432"
     healthcheck:
@@ -36,16 +36,12 @@ services:
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: .
-      dockerfile: api-gateway/Dockerfile
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
     container_name: raksetu-gateway
     restart: unless-stopped
-    command: sh -c "pip install boto3 && uvicorn main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
-    volumes:
-      - ./lambdas:/lambdas
-      - ./agent:/agent
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
@@ -60,30 +56,30 @@ services:
       STORY_URL:        http://story-engine:8007
       ANALYTICS_URL:    http://analytics-service:8008
       DEMO_MODE:        ${DEMO_MODE:-true}
-      # ── Bedrock / Agent ────────────────────────────────────────────
-      BEDROCK_LITE_MODEL_ID:       ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
-      BEDROCK_MICRO_MODEL_ID:      ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
-      AWS_ACCESS_KEY_ID:           ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:       ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION:                  ${AWS_REGION:-us-east-1}
-      S3_BUCKET:                   ${S3_BUCKET:-raksetu-models}
-      STEP_FUNCTION_ARN_CASCADE:   ${CASCADE_ARN:-}
-      MEMORY_CONTEXT_SIZE:         "10"
-      DYNAMO_FAILURE_LOG_TABLE:    raksetu-failure-log
+      # ── Phase 1: LangGraph multi-agent ──────────────────────────────────────
+      BEDROCK_MICRO_MODEL_ID:  ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
+      BEDROCK_LITE_MODEL_ID:   ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
+      AWS_ACCESS_KEY_ID:       ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY:   ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION:              ${AWS_REGION:-us-east-1}
+      POSTGRES_CHECKPOINTING:  ${POSTGRES_CHECKPOINTING:-false}
+      LANGCHAIN_TRACING_V2:    ${LANGCHAIN_TRACING_V2:-false}
+      LANGCHAIN_API_KEY:       ${LANGCHAIN_API_KEY:-}
+      LANGCHAIN_PROJECT:       ${LANGCHAIN_PROJECT:-raksetu-production}
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   matching-service:
     build:
-      context: .
-      dockerfile: matching-service/Dockerfile
+      context: ./backend/matching-service
+      dockerfile: Dockerfile
     container_name: raksetu-matching
     restart: unless-stopped
     ports:
       - "8001:8001"
     volumes:
-      - ./matching-service/models:/app/matching-service/models
+      - ./backend/matching-service/models:/app/models
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:    redis://redis:6379
@@ -94,86 +90,63 @@ services:
 
   prediction-service:
     build:
-      context: .
-      dockerfile: prediction-service/Dockerfile
+      context: ./backend/prediction-service
+      dockerfile: Dockerfile
     container_name: raksetu-prediction
     restart: unless-stopped
-    command: sh -c "pip install boto3 && uvicorn main:app --host 0.0.0.0 --port 8002"
     ports:
       - "8002:8002"
     volumes:
-      - ./prediction-service/models:/app/prediction-service/models
-      - ./lambdas:/lambdas
+      - ./backend/prediction-service/models:/app/models
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:    redis://redis:6379
       DEMO_MODE:    ${DEMO_MODE:-true}
-      # ── Bedrock / Upgrade 4 ────────────────────────────────────────────────
-      BEDROCK_MICRO_MODEL_ID:  ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
-      AWS_ACCESS_KEY_ID:       ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:   ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION:              ${AWS_REGION:-us-east-1}
-      S3_BUCKET:               ${S3_BUCKET:-raksetu-models}
-      NOTIFICATION_URL:        http://notification-service:8003
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   notification-service:
     build:
-      context: .
-      dockerfile: notification-service/Dockerfile
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
     container_name: raksetu-notification
     restart: unless-stopped
-    command: sh -c "pip install boto3 && uvicorn main:app --host 0.0.0.0 --port 8003"
     ports:
       - "8003:8003"
-    volumes:
-      - ./lambdas:/lambdas
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
+      CELERY_BROKER:    redis://redis:6379/1
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
       GUPSHUP_SOURCE_NUMBER: ${GUPSHUP_SOURCE_NUMBER:-}
       GUPSHUP_APP_NAME: BloodWarriors
       STORY_URL:        http://story-engine:8007
       DEMO_MODE:        ${DEMO_MODE:-true}
-      # ── Bedrock / Upgrades 1,3,5 ──────────────────────────────────────
-      BEDROCK_LITE_MODEL_ID:  ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
-      BEDROCK_MICRO_MODEL_ID: ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
-      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION:             ${AWS_REGION:-us-east-1}
-      MEMORY_CONTEXT_SIZE:    "10"
-      NOTIFICATION_URL:       http://notification-service:8003
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
 
   celery-worker:
     build:
-      context: .
-      dockerfile: notification-service/Dockerfile
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
-    command: celery -A main.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A celery_tasks worker --loglevel=info --concurrency=4
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    ${CELERY_BROKER:-sqs://}
+      CELERY_BROKER:    redis://redis:6379/1
       GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
-      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION:             ${AWS_REGION:-us-east-1}
       DEMO_MODE:        ${DEMO_MODE:-true}
     depends_on:
       redis: { condition: service_healthy }
 
   voice-service:
     build:
-      context: .
-      dockerfile: voice-service/Dockerfile
+      context: ./backend/voice-service
+      dockerfile: Dockerfile
     container_name: raksetu-voice
     restart: unless-stopped
     ports:
@@ -192,25 +165,25 @@ services:
 
   federated-aggregator:
     build:
-      context: .
-      dockerfile: federated-aggregator/Dockerfile
+      context: ./backend/federated-aggregator
+      dockerfile: Dockerfile
     container_name: raksetu-federated
     restart: unless-stopped
     ports:
       - "8005:8005"
       - "9090:9090"    # Flower FL server port
     volumes:
-      - ./federated-aggregator/models:/app/federated-aggregator/models/global
+      - ./backend/federated-aggregator/models:/app/models/global
     environment:
       FL_MIN_CLIENTS: "2"    # 2 for demo (3 for prod)
       FLOWER_PORT:    "9090"
-      MODEL_DIR:      /app/federated-aggregator/models/global
+      MODEL_DIR:      /app/models/global
       DEMO_MODE:      ${DEMO_MODE:-true}
 
   story-engine:
     build:
-      context: .
-      dockerfile: story-engine/Dockerfile
+      context: ./backend/story-engine
+      dockerfile: Dockerfile
     container_name: raksetu-story
     restart: unless-stopped
     ports:
@@ -220,11 +193,6 @@ services:
       REDIS_URL:       redis://redis:6379
       GEMINI_API_KEY:  ${GEMINI_API_KEY:-}
       DEMO_MODE:       ${DEMO_MODE:-true}
-      # ── Bedrock (story generation fallback) ──────────────────────────────
-      BEDROCK_LITE_MODEL_ID:  ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
-      AWS_ACCESS_KEY_ID:      ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:  ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_REGION:             ${AWS_REGION:-us-east-1}
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
@@ -232,7 +200,7 @@ services:
   # ─── Frontend ────────────────────────────────────────────────────────────────
   frontend:
     build:
-      context: ../frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: raksetu-frontend
     restart: unless-stopped
@@ -244,8 +212,8 @@ services:
   # ─── Federated nodes (demo: 2 simulated hospital nodes) ──────────────────────
   fl-node-hospital-1:
     build:
-      context: .
-      dockerfile: federated-aggregator/Dockerfile
+      context: ./backend/federated-aggregator
+      dockerfile: Dockerfile
     container_name: raksetu-fl-node-1
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_mumbai --aggregator federated-aggregator:9090
@@ -259,8 +227,8 @@ services:
 
   fl-node-hospital-2:
     build:
-      context: .
-      dockerfile: federated-aggregator/Dockerfile
+      context: ./backend/federated-aggregator
+      dockerfile: Dockerfile
     container_name: raksetu-fl-node-2
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_delhi --aggregator federated-aggregator:9090

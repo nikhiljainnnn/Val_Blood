@@ -87,3 +87,16 @@ credentials.csv
 check_bedrock.py
 check_aws.py
 test_credentials.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+*.pid
+
+# Linter / Type Checker caches
+.mypy_cache/
+.ruff_cache/
+
+# Databases
+*.db
+*.sqlite3

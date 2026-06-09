@@ -4,21 +4,13 @@ RakSetu API Gateway
 - Rate limiting (Redis sliding window)
 - Reverse proxy to microservices
 - WebSocket hub for real-time dashboard
-- UPGRADE 2: Guest activation engine  (POST /admin/activate-guests)
-- UPGRADE 6: Past-due transfusion alerts (POST /admin/alerts/scan)
-- AGENT:    Bedrock Supervisor orchestrator (POST /agent/run)
 """
 import os
-import sys
 import json
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
-
-# Load secrets from SSM Parameter Store before initializing anything else
-from shared.ssm_loader import load_ssm_parameters
-load_ssm_parameters()
 
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
@@ -28,6 +20,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from auth import (
     create_access_token,
     verify_token,
+    hash_password,
+    verify_password,
     TokenData,
 )
 from rate_limit import RateLimiter
@@ -40,16 +34,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 from datetime import datetime
-
-# ── Upgrade + Agent wiring ────────────────────────────────────────────────────
-_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
-_BACKEND_DIR = os.path.join(os.path.dirname(__file__), '..')
-sys.path.insert(0, _LAMBDAS_DIR)
-sys.path.insert(0, _BACKEND_DIR)
-
-from upgrade2_guest_activator import router as guest_router      # noqa: E402
-from upgrade6_past_due_alerts  import router as alerts_router    # noqa: E402
-from agent.orchestrator        import router as agent_router     # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api-gateway")
@@ -108,9 +92,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RakSetu API Gateway",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
+
+# ── Phase 1: LangGraph multi-agent router ─────────────────────────────────────
+import sys
+import os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+try:
+    from agent.orchestrator import router as agent_router
+    app.include_router(agent_router, prefix="/api/v1")
+except ImportError as _e:
+    import logging as _logging
+    _logging.getLogger("api-gateway").warning(f"Agent router not loaded: {_e}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -120,18 +115,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-security    = HTTPBearer()
-limiter     = RateLimiter()
+security  = HTTPBearer()
+limiter   = RateLimiter()
 http_client = httpx.AsyncClient(timeout=30.0)
-
-# ── Mount upgrade + agent routers ─────────────────────────────────────────────
-# These are mounted directly on the gateway (no prefix clash with /api/v1).
-# guest_router  → /admin/activate-guests, /admin/guest-pool/stats
-# alerts_router → /admin/alerts/scan, /admin/alerts/summary, /admin/alerts/cascade/{id}
-# agent_router  → /agent/run, /agent/scheduled, /agent/status
-app.include_router(guest_router)
-app.include_router(alerts_router)
-app.include_router(agent_router)
 
 
 # ─── Auth helpers ─────────────────────────────────────────────────────────────
@@ -257,76 +243,11 @@ async def get_guardian_circle(
     return await _proxy("matching", f"/guardian-circle/{patient_id}")
 
 
-@app.get("/api/v1/patients")
-async def get_all_patients(
-    db: AsyncSession = Depends(get_db),
-    user: TokenData = Depends(get_current_user)
-):
-    # Get all patients ordered by newest first
-    result = await db.execute(
-        select(Patient, Person)
-        .join(Person, Patient.person_id == Person.id)
-        .order_by(Patient.created_at.desc())
-    )
-    rows = result.all()
-    patients = []
-    for pat, per in rows:
-        patients.append({
-            "id": pat.id,
-            "name": per.name,
-            "age": pat.age,
-            "city": per.city,
-            "hospital": "Mumbai Thalassemia Center", # Defaulting for now
-            "thalassemia_type": pat.thalassemia_type,
-            "transfusion_interval_days": pat.transfusion_interval_days
-        })
-    return patients
-
-
-@app.get("/api/v1/patients/{patient_id}")
-async def get_patient_by_id(
-    patient_id: str,
-    db: AsyncSession = Depends(get_db),
-    user: TokenData = Depends(get_current_user)
-):
-    result = await db.execute(
-        select(Patient, Person, AntigenProfile)
-        .join(Person, Patient.person_id == Person.id)
-        .outerjoin(AntigenProfile, AntigenProfile.person_id == Person.id)
-        .where(Patient.id == patient_id)
-    )
-    row = result.first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Patient not found")
-        
-    pat, per, profile = row
-    return {
-        "id": pat.id,
-        "name": per.name,
-        "age": pat.age,
-        "city": per.city,
-        "hospital": "Mumbai Thalassemia Center", # Default
-        "thalassemia_type": pat.thalassemia_type,
-        "transfusion_interval_days": pat.transfusion_interval_days,
-        "abo": profile.abo if profile else "B",
-        "rh_d": profile.rh_d if profile else True,
-        "total_transfusions": 12, # Demo value
-        "circle_health": 0.92     # Demo value
-    }
-
-
 @app.get("/api/v1/churn/batch")
 async def get_churn_predictions(
     user: TokenData = Depends(get_current_user),
 ):
     return await _proxy("prediction", "/churn/batch")
-
-
-@app.get("/api/v1/demo/summary")
-async def get_demo_summary(
-    user: TokenData = Depends(get_current_user),
-):
-    return await _proxy("prediction", "/demo/summary")
 
 
 @app.get("/api/v1/hb-forecast/{patient_id}")
@@ -363,88 +284,6 @@ async def get_dashboard_stats(user: TokenData = Depends(get_current_user)):
 @app.get("/api/v1/inventory")
 async def get_inventory(user: TokenData = Depends(get_current_user)):
     return await _proxy("analytics", "/inventory")
-
-
-# ── Frontend-facing /api/v1/admin/* proxy routes ──────────────────────────────
-# Lets the React app call /api/v1/admin/... through the same base URL.
-@app.get("/api/v1/admin/alerts/summary")
-async def api_alert_summary(user: TokenData = Depends(get_current_user)):
-    from upgrade6_past_due_alerts import get_alert_summary
-    return await get_alert_summary()
-
-
-@app.post("/api/v1/admin/alerts/scan")
-async def api_alert_scan(user: TokenData = Depends(get_current_user)):
-    from upgrade6_past_due_alerts import run_alert_scan
-    return await run_alert_scan()
-
-
-@app.post("/api/v1/admin/alerts/cascade/{patient_id}")
-async def api_cascade_patient(
-    patient_id: str,
-    urgency: str = "urgent",
-    user: TokenData = Depends(get_current_user),
-):
-    from upgrade6_past_due_alerts import trigger_cascade_for_patient
-    return await trigger_cascade_for_patient(patient_id, urgency)
-
-
-@app.get("/api/v1/admin/guest-pool/stats")
-async def api_guest_stats(user: TokenData = Depends(get_current_user)):
-    from upgrade2_guest_activator import guest_pool_stats
-    return await guest_pool_stats()
-
-
-@app.post("/api/v1/admin/activate-guests")
-async def api_activate_guests(
-    body: dict = {},
-    user: TokenData = Depends(get_current_user),
-):
-    from upgrade2_guest_activator import ActivateGuestsIn, activate_guests
-    from shared.db import get_db
-    # Use async generator manually to get the db session
-    db_gen = get_db()
-    db = await db_gen.__anext__()
-    try:
-        return await activate_guests(
-            ActivateGuestsIn(
-                blood_group=body.get("blood_group"),
-                limit=body.get("limit", 100),
-            ),
-            db=db,
-        )
-    finally:
-        await db_gen.aclose()
-
-
-# ── Frontend-facing /api/v1/agent/* routes ────────────────────────────────────
-@app.post("/api/v1/agent/run")
-async def api_agent_run(
-    body: dict,
-):
-    from agent.orchestrator import run_supervisor
-    messages = body.get("messages")
-    if not messages:
-        messages = [{"role": "user", "content": [{"text": body.get("task", "")}]}]
-    return await run_supervisor(messages, body.get("context", {}))
-
-
-@app.post("/api/v1/agent/scheduled")
-async def api_agent_scheduled(
-    body: dict,
-    user: TokenData = Depends(get_current_user),
-):
-    from agent.orchestrator import run_scheduled
-    from pydantic import BaseModel
-    class _In(BaseModel):
-        trigger: str
-    return await run_scheduled(_In(trigger=body.get("trigger", "daily_churn_scan")))
-
-
-@app.get("/api/v1/agent/status")
-async def api_agent_status():
-    from agent.orchestrator import agent_status
-    return await agent_status()
 
 
 # ─── WebSocket ────────────────────────────────────────────────────────────────
