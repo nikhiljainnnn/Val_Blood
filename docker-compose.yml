@@ -36,8 +36,8 @@ services:
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./api-gateway/Dockerfile
     container_name: raksetu-gateway
     restart: unless-stopped
     ports:
@@ -72,8 +72,8 @@ services:
 
   matching-service:
     build:
-      context: ./backend/matching-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./matching-service/Dockerfile
     container_name: raksetu-matching
     restart: unless-stopped
     ports:
@@ -90,8 +90,8 @@ services:
 
   prediction-service:
     build:
-      context: ./backend/prediction-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./prediction-service/Dockerfile
     container_name: raksetu-prediction
     restart: unless-stopped
     ports:
@@ -108,8 +108,8 @@ services:
 
   notification-service:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./notification-service/Dockerfile
     container_name: raksetu-notification
     restart: unless-stopped
     ports:
@@ -129,8 +129,8 @@ services:
 
   celery-worker:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./notification-service/Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
     command: celery -A celery_tasks worker --loglevel=info --concurrency=4
@@ -145,8 +145,8 @@ services:
 
   voice-service:
     build:
-      context: ./backend/voice-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./voice-service/Dockerfile
     container_name: raksetu-voice
     restart: unless-stopped
     ports:
@@ -165,8 +165,8 @@ services:
 
   federated-aggregator:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./federated-aggregator/Dockerfile
     container_name: raksetu-federated
     restart: unless-stopped
     ports:
@@ -182,8 +182,8 @@ services:
 
   story-engine:
     build:
-      context: ./backend/story-engine
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./story-engine/Dockerfile
     container_name: raksetu-story
     restart: unless-stopped
     ports:
@@ -212,8 +212,8 @@ services:
   # ─── Federated nodes (demo: 2 simulated hospital nodes) ──────────────────────
   fl-node-hospital-1:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./federated-aggregator/Dockerfile
     container_name: raksetu-fl-node-1
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_mumbai --aggregator federated-aggregator:9090
@@ -227,8 +227,8 @@ services:
 
   fl-node-hospital-2:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./federated-aggregator/Dockerfile
     container_name: raksetu-fl-node-2
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_delhi --aggregator federated-aggregator:9090
