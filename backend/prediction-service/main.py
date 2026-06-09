@@ -32,7 +32,9 @@ from churn_model import DonorChurnPredictor
 from hb_forecaster import HbDropForecaster
 
 # ── Upgrade wiring ────────────────────────────────────────────────────────
-_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
+_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), 'lambdas')
+if not os.path.exists(_LAMBDAS_DIR):
+    _LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
 sys.path.insert(0, _LAMBDAS_DIR)
 from upgrade4_conversion_model import router as conversion_router  # noqa: E402
 

@@ -133,7 +133,7 @@ services:
       dockerfile: ./notification-service/Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
-    command: celery -A celery_tasks worker --loglevel=info --concurrency=4
+    command: celery -A main.celery_app worker --loglevel=info --concurrency=4
     environment:
       DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
       REDIS_URL:        redis://redis:6379

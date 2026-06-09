@@ -33,7 +33,10 @@ from sns_client import SNSClient
 from templates import get_template, get_sms_template
 
 # ── Upgrade wiring ────────────────────────────────────────────────────────────
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lambdas'))
+_LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), 'lambdas')
+if not os.path.exists(_LAMBDAS_DIR):
+    _LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), '..', 'lambdas')
+sys.path.insert(0, _LAMBDAS_DIR)
 from upgrade1_failure_learner import router as failure_router    # noqa: E402
 from upgrade3_conversation_memory import append_event            # noqa: E402
 from upgrade5_awareness_campaign import router as awareness_router  # noqa: E402
