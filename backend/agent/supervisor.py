@@ -293,6 +293,10 @@ def compile_final_response(state: AgentState) -> str:
         parts.append(f"\n⚠ Errors: {'; '.join(errors)}")
 
     if not parts:
+        # If no structured data was returned, let's at least show the conversational messages from the agents!
+        fallback_msgs = [f"[{r.get('agent')}] {r.get('message')}" for r in results if r.get("message")]
+        if fallback_msgs:
+            return "No structured data. Agent replies:\n" + "\n".join(fallback_msgs)
         return "Task complete. No structured results returned."
 
     return "\n\n".join(parts)
