@@ -83,7 +83,7 @@ async def invoke_graph(task: str, context: dict[str, Any] | None = None,
     }
 
     try:
-        output = graph.invoke(state, config=config)
+        output = await graph.ainvoke(state, config=config)
     except Exception as e:
         logger.error(f"Graph invocation failed: {e}")
         return {
