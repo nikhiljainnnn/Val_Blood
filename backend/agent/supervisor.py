@@ -212,7 +212,12 @@ def supervisor_node(state: AgentState) -> AgentState:
                     SystemMessage(content=_SUPERVISOR_PROMPT),
                     HumanMessage(content=prompt),
                 ])
-                decision = response.content.strip().lower()
+                content_str = response.content
+                if isinstance(content_str, list):
+                    content_str = " ".join([c.get("text", "") for c in content_str if isinstance(c, dict) and "text" in c])
+                elif not isinstance(content_str, str):
+                    content_str = str(content_str)
+                decision = content_str.strip().lower()
                 next_agent = decision if decision in (AGENTS + [FINISH]) else _demo_route(state)
             except Exception as e:
                 logger.error(f"Supervisor LLM call failed: {e}. Falling back to keyword routing.")

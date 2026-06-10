@@ -93,16 +93,24 @@ async def invoke_graph(task: str, context: dict[str, Any] | None = None,
             "ts":       datetime.utcnow().isoformat(),
         }
 
+    def _get_text(content) -> str:
+        if isinstance(content, list):
+            return " ".join([c.get("text", "") for c in content if isinstance(c, dict) and "text" in c])
+        elif isinstance(content, str):
+            return content
+        return str(content)
+
     final_response = ""
     agents_used    = []
     for msg in reversed(output.get("messages", [])):
         if hasattr(msg, "content") and msg.content:
+            msg_str = _get_text(msg.content)
             if not final_response:
-                final_response = msg.content
-            if msg.content.startswith("["):
-                bracket_end = msg.content.find("]")
+                final_response = msg_str
+            if msg_str.startswith("["):
+                bracket_end = msg_str.find("]")
                 if bracket_end > 0:
-                    agent_name = msg.content[1:bracket_end]
+                    agent_name = msg_str[1:bracket_end]
                     if agent_name not in agents_used:
                         agents_used.append(agent_name)
 

@@ -31,6 +31,13 @@ import os
 from functools import lru_cache
 from typing import Literal
 
+def _get_text(content) -> str:
+    if isinstance(content, list):
+        return " ".join([c.get("text", "") for c in content if isinstance(c, dict) and "text" in c])
+    elif isinstance(content, str):
+        return content
+    return str(content)
+
 from langchain_core.messages import AIMessage, HumanMessage
 
 from langgraph.graph import StateGraph, START, END
@@ -145,10 +152,9 @@ def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> Agent
 
     # Real agent call
     try:
-        agent_state = {"messages": state["messages"]}
-        output      = agent_instance.invoke(agent_state)
-        last_msg    = output["messages"][-1]
-        response_text = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
+        output        = agent_instance.invoke({"messages": state["messages"]})
+        last_msg      = output["messages"][-1]
+        response_text = _get_text(last_msg.content) if hasattr(last_msg, "content") else str(last_msg)
 
         result = {
             "agent":   agent_name,
@@ -158,12 +164,14 @@ def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> Agent
 
         # Try to extract structured data from the last tool call output
         for msg in reversed(output["messages"]):
-            if hasattr(msg, "content") and msg.content.strip().startswith("{"):
-                try:
-                    result["data"] = json.loads(msg.content)
-                    break
-                except Exception:
-                    pass
+            if hasattr(msg, "content"):
+                msg_str = _get_text(msg.content)
+                if msg_str.strip().startswith("{"):
+                    try:
+                        result["data"] = json.loads(msg_str)
+                        break
+                    except Exception:
+                        pass
 
         return {
             **state,
