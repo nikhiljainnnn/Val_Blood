@@ -64,7 +64,7 @@ _ROUTING_KEYWORDS = {
     "prediction_agent": ["churn", "risk", "score", "convert", "conversion",
                          "history", "context", "predict", "probability"],
     "outreach_agent":   ["send", "message", "outreach", "story", "notify",
-                         "whatsapp", "sms", "voice", "contact", "call", "failure"],
+                         "whatsapp", "sms", "voice", "contact", "call", "failure", "campaign"],
 }
 
 
@@ -99,7 +99,11 @@ def _demo_route(state: AgentState) -> str:
         scores[agent] = sum(1 for k in keywords if k in last_human)
 
     best = max(scores, key=lambda a: scores[a])
+    if best in existing_agents:
+        return FINISH
     if scores[best] == 0:
+        if "matching_agent" in existing_agents:
+            return FINISH
         return "matching_agent"   # sensible default
     return best
 
