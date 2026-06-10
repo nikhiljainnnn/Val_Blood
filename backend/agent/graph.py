@@ -132,7 +132,7 @@ def _demo_specialist_response(agent_name: str, state: AgentState) -> dict:
     return {"agent": agent_name, "data": {}, "message": "Demo response"}
 
 
-def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> AgentState:
+async def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> AgentState:
     """
     Run a specialist agent and merge its output into state.
     If the agent fails or is None (demo mode), uses demo data.
@@ -152,7 +152,7 @@ def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> Agent
 
     # Real agent call
     try:
-        output        = agent_instance.invoke({"messages": state["messages"]})
+        output        = await agent_instance.ainvoke({"messages": state["messages"]})
         last_msg      = output["messages"][-1]
         response_text = _get_text(last_msg.content) if hasattr(last_msg, "content") else str(last_msg)
 
@@ -198,19 +198,19 @@ def _run_specialist(agent_instance, agent_name: str, state: AgentState) -> Agent
         }
 
 
-def matching_node(state: AgentState) -> AgentState:
+async def matching_node(state: AgentState) -> AgentState:
     _ensure_agents()
-    return _run_specialist(_matching_agent_instance, "matching_agent", state)
+    return await _run_specialist(_matching_agent_instance, "matching_agent", state)
 
 
-def prediction_node(state: AgentState) -> AgentState:
+async def prediction_node(state: AgentState) -> AgentState:
     _ensure_agents()
-    return _run_specialist(_prediction_agent_instance, "prediction_agent", state)
+    return await _run_specialist(_prediction_agent_instance, "prediction_agent", state)
 
 
-def outreach_node(state: AgentState) -> AgentState:
+async def outreach_node(state: AgentState) -> AgentState:
     _ensure_agents()
-    return _run_specialist(_outreach_agent_instance, "outreach_agent", state)
+    return await _run_specialist(_outreach_agent_instance, "outreach_agent", state)
 
 
 def finish_node(state: AgentState) -> AgentState:
