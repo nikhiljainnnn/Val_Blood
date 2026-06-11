@@ -57,8 +57,8 @@ services:
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./api-gateway/Dockerfile
     container_name: raksetu-gateway
     restart: unless-stopped
     expose:
@@ -85,8 +85,8 @@ services:
 
   matching-service:
     build:
-      context: ./backend/matching-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./matching-service/Dockerfile
     container_name: raksetu-matching
     restart: unless-stopped
     expose:
@@ -102,8 +102,8 @@ services:
 
   prediction-service:
     build:
-      context: ./backend/prediction-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./prediction-service/Dockerfile
     container_name: raksetu-prediction
     restart: unless-stopped
     expose:
@@ -133,8 +133,8 @@ services:
 
   notification-service:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./notification-service/Dockerfile
     container_name: raksetu-notification
     restart: unless-stopped
     expose:
@@ -153,8 +153,8 @@ services:
 
   celery-worker:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./notification-service/Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
     command: celery -A main.celery_app worker --loglevel=info --concurrency=2
@@ -179,8 +179,8 @@ services:
 
   voice-service:
     build:
-      context: ./backend/voice-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./voice-service/Dockerfile
     container_name: raksetu-voice
     restart: unless-stopped
     expose:
@@ -196,8 +196,8 @@ services:
 
   federated-aggregator:
     build:
-      context: ./backend/federated-aggregator
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./federated-aggregator/Dockerfile
     container_name: raksetu-federated
     restart: unless-stopped
     expose:
@@ -212,8 +212,8 @@ services:
 
   story-engine:
     build:
-      context: ./backend/story-engine
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ./story-engine/Dockerfile
     container_name: raksetu-story
     restart: unless-stopped
     expose:
