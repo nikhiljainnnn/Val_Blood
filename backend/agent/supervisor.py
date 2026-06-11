@@ -218,7 +218,13 @@ def supervisor_node(state: AgentState) -> AgentState:
                 elif not isinstance(content_str, str):
                     content_str = str(content_str)
                 decision = content_str.strip().lower()
-                next_agent = decision if decision in (AGENTS + [FINISH]) else _demo_route(state)
+                
+                # Prevent infinite loops: if the LLM suggests an agent we already used, force FINISH or fallback
+                existing_agents = {r.get("agent") for r in state.get("tool_results", []) if "agent" in r}
+                if decision in existing_agents:
+                    decision = "finish"
+
+                next_agent = decision if decision in (AGENTS + [FINISH, "finish"]) else _demo_route(state)
             except Exception as e:
                 logger.error(f"Supervisor LLM call failed: {e}. Falling back to keyword routing.")
                 next_agent = _demo_route(state)
