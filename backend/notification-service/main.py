@@ -55,6 +55,15 @@ celery_app.conf.accept_content         = ["json"]
 celery_app.conf.task_acks_late         = True
 celery_app.conf.worker_prefetch_multiplier = 1
 
+# ── Phase 2: MLOps Celery Tasks & Beat Schedule ───────────────────────────────
+try:
+    import celery_tasks_mlops
+    if hasattr(celery_app.conf, "beat_schedule") and celery_app.conf.beat_schedule:
+        celery_app.conf.beat_schedule.update(celery_tasks_mlops.MLOPS_BEAT_SCHEDULE)
+    else:
+        celery_app.conf.beat_schedule = celery_tasks_mlops.MLOPS_BEAT_SCHEDULE
+except Exception as e:
+    logger.warning(f"Could not load MLOps celery tasks: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
