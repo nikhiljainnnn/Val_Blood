@@ -34,6 +34,26 @@ services:
       interval: 10s
       retries: 5
 
+  # ─── Phase 2: MLflow tracking server ─────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.15.1
+    container_name: raksetu-mlflow
+    restart: unless-stopped
+    expose:
+      - "5000"
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/mlflow --default-artifact-root /mlflow/artifacts --serve-artifacts
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5000/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
     build:
@@ -90,13 +110,26 @@ services:
       - "8002"
     volumes:
       - model-data:/app/models
+      - ./backend/mlops:/app/mlops
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
       REDIS_URL:    redis://redis:6379
       DEMO_MODE:    ${DEMO_MODE:-false}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT: raksetu-churn-prediction
+      CHURN_MODEL_PATH: models/churn_xgb.pkl
+      HB_MODEL_PATH: models/hb_lstm.pt
+      MODEL_OUTPUT_DIR: models
+      DRIFT_PSI_THRESHOLD: "0.2"
+      RETRAIN_MIN_SAMPLES: "100"
+      S3_BUCKET: ${S3_BUCKET:-raksetu-models}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
+      mlflow:   { condition: service_started }
 
   notification-service:
     build:
@@ -124,15 +157,25 @@ services:
       dockerfile: Dockerfile
     container_name: raksetu-celery
     restart: unless-stopped
-    command: celery -A celery_tasks worker --loglevel=info --concurrency=2
+    command: celery -A main.celery_app worker --loglevel=info --concurrency=2
     environment:
       DATABASE_URL:    postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-raksetu_prod}@postgres/raksetu
       REDIS_URL:       redis://redis:6379
       CELERY_BROKER:   redis://redis:6379/1
       GUPSHUP_API_KEY: ${GUPSHUP_API_KEY:-}
       DEMO_MODE:       ${DEMO_MODE:-false}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT: raksetu-churn-prediction
+      DRIFT_PSI_THRESHOLD: "0.2"
+      S3_BUCKET: ${S3_BUCKET:-raksetu-models}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./backend/mlops:/app/mlops
     depends_on:
       redis: { condition: service_healthy }
+      mlflow: { condition: service_started }
 
   voice-service:
     build:
@@ -202,6 +245,7 @@ services:
 volumes:
   pgdata:
   model-data:    # shared between matching + prediction services
+  mlflow-artifacts:
 
 networks:
   default:
