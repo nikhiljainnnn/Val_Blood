@@ -8,16 +8,16 @@ services:
     container_name: raksetu-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       raksetu
-      POSTGRES_USER:     postgres
+      POSTGRES_DB: raksetu
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: raksetu_dev
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./backend/infra/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d raksetu"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d raksetu" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -29,9 +29,29 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       retries: 5
+
+  # ─── Phase 2: MLflow tracking server ─────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.15.1
+    container_name: raksetu-mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://postgres:raksetu_dev@postgres/mlflow --default-artifact-root /mlflow/artifacts --serve-artifacts
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5000/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ─── Backend services ────────────────────────────────────────────────────────
   api-gateway:
@@ -43,33 +63,33 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:        redis://redis:6379
-      JWT_SECRET:       ${JWT_SECRET:-dev_secret_change_in_production_32chars}
-      JWT_ALGORITHM:    HS256
+      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production_32chars}
+      JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: "1440"
-      MATCHING_URL:     http://matching-service:8001
-      PREDICTION_URL:   http://prediction-service:8002
+      MATCHING_URL: http://matching-service:8001
+      PREDICTION_URL: http://prediction-service:8002
       NOTIFICATION_URL: http://notification-service:8003
-      VOICE_URL:        http://voice-service:8004
-      FEDERATED_URL:    http://federated-aggregator:8005
-      STORY_URL:        http://story-engine:8007
-      ANALYTICS_URL:    http://analytics-service:8008
-      DEMO_MODE:        ${DEMO_MODE:-true}
-      # ── Phase 1: LangGraph multi-agent ──────────────────────────────────────
-      BEDROCK_MICRO_MODEL_ID:  ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
-      BEDROCK_LITE_MODEL_ID:   ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
-      AWS_ACCESS_KEY_ID:       ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY:   ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_SESSION_TOKEN:       ${AWS_SESSION_TOKEN:-}
-      AWS_REGION:              ${AWS_REGION:-us-east-1}
-      POSTGRES_CHECKPOINTING:  ${POSTGRES_CHECKPOINTING:-false}
-      LANGCHAIN_TRACING_V2:    ${LANGCHAIN_TRACING_V2:-false}
-      LANGCHAIN_API_KEY:       ${LANGCHAIN_API_KEY:-}
-      LANGCHAIN_PROJECT:       ${LANGCHAIN_PROJECT:-raksetu-production}
+      VOICE_URL: http://voice-service:8004
+      FEDERATED_URL: http://federated-aggregator:8005
+      STORY_URL: http://story-engine:8007
+      ANALYTICS_URL: http://analytics-service:8008
+      DEMO_MODE: ${DEMO_MODE:-true}
+      # ── Phase 1: LangGraph multi-agent ────────────────────────────────────
+      BEDROCK_MICRO_MODEL_ID: ${BEDROCK_MICRO_MODEL_ID:-amazon.nova-micro-v1:0}
+      BEDROCK_LITE_MODEL_ID: ${BEDROCK_LITE_MODEL_ID:-amazon.nova-lite-v1:0}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      POSTGRES_CHECKPOINTING: ${POSTGRES_CHECKPOINTING:-false}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-raksetu-production}
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   matching-service:
     build:
@@ -83,11 +103,11 @@ services:
       - ./backend/matching-service/models:/app/models
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:    redis://redis:6379
-      DEMO_MODE:    ${DEMO_MODE:-true}
+      REDIS_URL: redis://redis:6379
+      DEMO_MODE: ${DEMO_MODE:-true}
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   prediction-service:
     build:
@@ -99,13 +119,29 @@ services:
       - "8002:8002"
     volumes:
       - ./backend/prediction-service/models:/app/models
+      # ── Phase 2: mount mlops/ into container ─────────────────────────────
+      - ./backend/mlops:/app/mlops
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:    redis://redis:6379
-      DEMO_MODE:    ${DEMO_MODE:-true}
+      REDIS_URL: redis://redis:6379
+      DEMO_MODE: ${DEMO_MODE:-true}
+      # ── Phase 2: MLOps ──────────────────────────────────────────────────
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT: raksetu-churn-prediction
+      CHURN_MODEL_PATH: models/churn_xgb.pkl
+      HB_MODEL_PATH: models/hb_lstm.pt
+      MODEL_OUTPUT_DIR: models
+      DRIFT_PSI_THRESHOLD: "0.2"
+      RETRAIN_MIN_SAMPLES: "100"
+      S3_BUCKET: ${S3_BUCKET:-raksetu-models}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mlflow: { condition: service_started }
 
   notification-service:
     build:
@@ -116,17 +152,17 @@ services:
     ports:
       - "8003:8003"
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    redis://redis:6379/1
-      GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
+      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      REDIS_URL: redis://redis:6379
+      CELERY_BROKER: redis://redis:6379/1
+      GUPSHUP_API_KEY: ${GUPSHUP_API_KEY:-}
       GUPSHUP_SOURCE_NUMBER: ${GUPSHUP_SOURCE_NUMBER:-}
       GUPSHUP_APP_NAME: BloodWarriors
-      STORY_URL:        http://story-engine:8007
-      DEMO_MODE:        ${DEMO_MODE:-true}
+      STORY_URL: http://story-engine:8007
+      DEMO_MODE: ${DEMO_MODE:-true}
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   celery-worker:
     build:
@@ -136,13 +172,26 @@ services:
     restart: unless-stopped
     command: celery -A main.celery_app worker --loglevel=info --concurrency=4
     environment:
-      DATABASE_URL:     postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:        redis://redis:6379
-      CELERY_BROKER:    redis://redis:6379/1
-      GUPSHUP_API_KEY:  ${GUPSHUP_API_KEY:-}
-      DEMO_MODE:        ${DEMO_MODE:-true}
+      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      REDIS_URL: redis://redis:6379
+      CELERY_BROKER: redis://redis:6379/1
+      GUPSHUP_API_KEY: ${GUPSHUP_API_KEY:-}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      # ── Phase 2: MLOps retrain task needs these ───────────────────────────
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT: raksetu-churn-prediction
+      DRIFT_PSI_THRESHOLD: "0.2"
+      S3_BUCKET: ${S3_BUCKET:-raksetu-models}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      # mlops/ must also be available in celery worker for retrain task
+      - ./backend/mlops:/app/mlops
     depends_on:
       redis: { condition: service_healthy }
+      mlflow: { condition: service_started }
 
   voice-service:
     build:
@@ -153,14 +202,14 @@ services:
     ports:
       - "8004:8004"
     environment:
-      DATABASE_URL:          postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      SARVAM_API_KEY:        ${SARVAM_API_KEY:-}
-      EXOTEL_SID:            ${EXOTEL_SID:-}
-      EXOTEL_TOKEN:          ${EXOTEL_TOKEN:-}
-      EXOTEL_CALLER_ID:      ${EXOTEL_CALLER_ID:-}
-      VOICE_CALLBACK_URL:    http://voice-service:8004/call/dtmf-webhook
-      DEMO_MODE:             ${DEMO_MODE:-true}
-      DEMO_AUDIO_BASE_URL:   http://voice-service:8004/static
+      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      EXOTEL_SID: ${EXOTEL_SID:-}
+      EXOTEL_TOKEN: ${EXOTEL_TOKEN:-}
+      EXOTEL_CALLER_ID: ${EXOTEL_CALLER_ID:-}
+      VOICE_CALLBACK_URL: http://voice-service:8004/call/dtmf-webhook
+      DEMO_MODE: ${DEMO_MODE:-true}
+      DEMO_AUDIO_BASE_URL: http://voice-service:8004/static
     depends_on:
       redis: { condition: service_healthy }
 
@@ -172,14 +221,14 @@ services:
     restart: unless-stopped
     ports:
       - "8005:8005"
-      - "9090:9090"    # Flower FL server port
+      - "9090:9090"
     volumes:
       - ./backend/federated-aggregator/models:/app/models/global
     environment:
-      FL_MIN_CLIENTS: "2"    # 2 for demo (3 for prod)
-      FLOWER_PORT:    "9090"
-      MODEL_DIR:      /app/models/global
-      DEMO_MODE:      ${DEMO_MODE:-true}
+      FL_MIN_CLIENTS: "2"
+      FLOWER_PORT: "9090"
+      MODEL_DIR: /app/models/global
+      DEMO_MODE: ${DEMO_MODE:-true}
 
   story-engine:
     build:
@@ -190,13 +239,13 @@ services:
     ports:
       - "8007:8007"
     environment:
-      DATABASE_URL:    postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
-      REDIS_URL:       redis://redis:6379
-      GEMINI_API_KEY:  ${GEMINI_API_KEY:-}
-      DEMO_MODE:       ${DEMO_MODE:-true}
+      DATABASE_URL: postgresql+asyncpg://postgres:raksetu_dev@postgres/raksetu
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEMO_MODE: ${DEMO_MODE:-true}
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   # ─── Frontend ────────────────────────────────────────────────────────────────
   frontend:
@@ -219,12 +268,12 @@ services:
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_mumbai --aggregator federated-aggregator:9090
     environment:
-      HOSPITAL_ID:       hospital_mumbai
+      HOSPITAL_ID: hospital_mumbai
       FL_AGGREGATOR_URL: federated-aggregator:9090
     depends_on:
       - federated-aggregator
     profiles:
-      - fl   # Only starts with: docker-compose --profile fl up
+      - fl
 
   fl-node-hospital-2:
     build:
@@ -234,7 +283,7 @@ services:
     restart: unless-stopped
     command: python node_client.py --hospital-id hospital_delhi --aggregator federated-aggregator:9090
     environment:
-      HOSPITAL_ID:       hospital_delhi
+      HOSPITAL_ID: hospital_delhi
       FL_AGGREGATOR_URL: federated-aggregator:9090
     depends_on:
       - federated-aggregator
@@ -243,6 +292,7 @@ services:
 
 volumes:
   pgdata:
+  mlflow-artifacts:
 
 networks:
   default:
